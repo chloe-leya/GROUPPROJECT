@@ -217,21 +217,46 @@ if run_analysis:
             primary_catalysts, hidden_risks = extract_granular_evidence(raw_analysis_text, sentiment_bias)
 
             # =====================================================================
-            # STEP 7: STRATEGIC RENDERING & DASHBOARD (OPTIMIZED hierarchy)
+            # STEP 7: STRATEGIC RENDERING & DASHBOARD
             # =====================================================================
             st.markdown("### 🎯 Real-Time Trading Intelligence Output")
             col1, col2, col3 = st.columns([1.1, 1.4, 1.1])
             
             with col1:
                 st.markdown("**Ranked Context Distribution:**")
-                # Visual Hierarchy Funneling for Topic Ranks
-                st.markdown(f"<div style='font-size:20px; font-weight:bold; margin-bottom:5px;'>🥇 Rank 1: {top_topics_ranked[0]['topic']} <span style='font-size:16px; font-weight:normal; color:#888;'>({top_topics_ranked[0]['confidence']:.2%})</span></div>", unsafe_html=True)
-                st.markdown(f"<div style='font-size:16px; font-weight:bold; margin-bottom:5px; color:#ddd;'>🥈 Rank 2: {top_topics_ranked[1]['topic']} <span style='font-size:13px; font-weight:normal; color:#888;'>({top_topics_ranked[1]['confidence']:.2%})</span></div>", unsafe_html=True)
-                st.markdown(f"<div style='font-size:13px; font-weight:normal; color:#aaa;'>🥉 Rank 3: {top_topics_ranked[2]['topic']} <span>({top_topics_ranked[2]['confidence']:.2%})</span></div>", unsafe_html=True)
+                
+                # Decoupling string token parsing from inner rendering dictionaries
+                r1_name = top_topics_ranked[0]['topic']
+                r1_conf = top_topics_ranked[0]['confidence']
+                
+                r2_name = top_topics_ranked[1]['topic']
+                r2_conf = top_topics_ranked[1]['confidence']
+                
+                r3_name = top_topics_ranked[2]['topic']
+                r3_conf = top_topics_ranked[2]['confidence']
+                
+                # Strict Visual Hierarchy Funneling using Standard Triple Quotes
+                st.markdown(f"""
+                    <div style='font-size:20px; font-weight:bold; margin-bottom:5px;'>
+                        Rank 1: {r1_name} <span style='font-size:16px; font-weight:normal; color:#888;'>({r1_conf:.2%})</span>
+                    </div>
+                """, unsafe_html=True)
+                
+                st.markdown(f"""
+                    <div style='font-size:16px; font-weight:bold; margin-bottom:5px; color:#ddd;'>
+                        Rank 2: {r2_name} <span style='font-size:13px; font-weight:normal; color:#888;'>({r2_conf:.2%})</span>
+                    </div>
+                """, unsafe_html=True)
+                
+                st.markdown(f"""
+                    <div style='font-size:13px; font-weight:normal; color:#aaa;'>
+                        Rank 3: {r3_name} <span>({r3_conf:.2%})</span>
+                    </div>
+                """, unsafe_html=True)
             
             with col2:
                 st.markdown("**Fine-Tuned Market Sentiment Matrix:**")
-                # Huge Institutional Display for Dominant Bias
+                # Institutional Display Component for Dominant Bias Matrix
                 st.markdown(f"""
                     <div style="background-color:rgba(255,255,255,0.05); padding:10px 15px; border-left: 5px solid {hex_color}; border-radius:4px; margin-bottom:15px;">
                         <span style="font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color:#888; display:block;">Dominant Market Bias</span>
@@ -240,7 +265,7 @@ if run_analysis:
                     </div>
                 """, unsafe_html=True)
                 
-                # Render clean progress distributions maps
+                # Distribution progress components
                 st.caption(f"Positive Variance Allocation: {pos_score:.2%}")
                 st.progress(float(pos_score))
                 
