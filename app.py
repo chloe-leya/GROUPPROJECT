@@ -225,7 +225,7 @@ if run_analysis:
             with col1:
                 st.markdown("**Ranked Context Distribution:**")
                 
-                # Pre-format all context allocation strings safely
+                # Standalone native allocations
                 r1_name = top_topics_ranked[0]['topic']
                 r2_name = top_topics_ranked[1]['topic']
                 r3_name = top_topics_ranked[2]['topic']
@@ -234,42 +234,28 @@ if run_analysis:
                 r2_conf_txt = f"{top_topics_ranked[1]['confidence']:.2%}"
                 r3_conf_txt = f"{top_topics_ranked[2]['confidence']:.2%}"
                 
-                st.markdown(f"""
-                    <div style='font-size:20px; font-weight:bold; margin-bottom:5px;'>
-                        🥇 Rank 1: {r1_name} <span style='font-size:16px; font-weight:normal; color:#888;'>({r1_conf_txt})</span>
-                    </div>
-                """, unsafe_html=True)
-                
-                st.markdown(f"""
-                    <div style='font-size:16px; font-weight:bold; margin-bottom:5px; color:#ddd;'>
-                        🥈 Rank 2: {r2_name} <span style='font-size:13px; font-weight:normal; color:#888;'>({r2_conf_txt})</span>
-                    </div>
-                """, unsafe_html=True)
-                
-                st.markdown(f"""
-                    <div style='font-size:13px; font-weight:normal; color:#aaa;'>
-                        🥉 Rank 3: {r3_name} <span>({r3_conf_txt})</span>
-                    </div>
-                """, unsafe_html=True)
+                # Pure Markdown Hierarchy (Funneling Layout without HTML Bugs)
+                st.markdown(f"### 🥇 {r1_name} `({r1_conf_txt})`")
+                st.markdown(f"#### 🥈 {r2_name} `({r2_conf_txt})`")
+                st.markdown(f"##### 🥉 {r3_name} `({r3_conf_txt})`")
             
             with col2:
                 st.markdown("**Fine-Tuned Market Sentiment Matrix:**")
                 
-                # Pre-format all sentiment allocation strings safely to bypass compiler check
                 max_score_txt = f"{max_score:.2%}"
                 pos_score_txt = f"Positive Variance Allocation: {pos_score:.2%}"
                 neu_score_txt = f"Neutral Variance Allocation: {neu_score:.2%}"
                 neg_score_txt = f"Negative Variance Allocation: {neg_score:.2%}"
                 
-                st.markdown(f"""
-                    <div style="background-color:rgba(255,255,255,0.05); padding:10px 15px; border-left: 5px solid {hex_color}; border-radius:4px; margin-bottom:15px;">
-                        <span style="font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color:#888; display:block;">Dominant Market Bias</span>
-                        <span style="font-size: 42px; font-weight: 900; color: {hex_color}; line-height:1.1;">{pred_sentiment}</span>
-                        <span style="font-size: 18px; font-weight: bold; margin-left: 10px; color:#aaa;">({max_score_txt})</span>
+                # Using st.html() to render the Dominant Sentiment cleanly and safely
+                st.html(f"""
+                    <div style="background-color:rgba(255,255,255,0.05); padding:12px; border-left:6px solid {hex_color}; border-radius:4px; margin-bottom:10px;">
+                        <span style="font-size:13px; text-transform:uppercase; color:#888; display:block; font-weight:bold;">Dominant Market Bias</span>
+                        <span style="font-size:40px; font-weight:900; color:{hex_color}; line-height:1;">{pred_sentiment}</span>
+                        <span style="font-size:18px; font-weight:700; color:#aaa; margin-left:8px;">({max_score_txt})</span>
                     </div>
-                """, unsafe_html=True)
+                """)
                 
-                # Streamlit standard visualization components
                 st.caption(pos_score_txt)
                 st.progress(float(pos_score))
                 
