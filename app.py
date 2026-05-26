@@ -30,10 +30,10 @@ TOPIC_LABELS = [
     "stock analysis investor opinion or commentary", "stock price movement rise fall or volatility"
 ]
 
-BULLISH_TRIGGERS = ["surged", "beat", "growth", "jumped", "positive", "highest", "record", "demand", "upgrade", "gained", "climb", "bullish", "rose", "soared", "soar", "strong", "rally"]
+BULLISH_TRIGGERS = ["surged", "beat", "growth", "jumped", "positive", "highest", "record", "demand", "upgrade", "gained", "climb", "bullish", "rose", "soared", "soar", "strong", "rally", "shines", "outpaced", "defied"]
 BEARISH_TRIGGERS = ["dropped", "missed", "fell", "slumped", "decline", "negative", "loss", "risk", "downgrade", "warned", "plunged", "deficit", "bearish", "constraint", "slowdown", "down", "weak", "disruption", "hamstrung", "shortage", "pressure", "bottleneck", "blockade"]
 
-STRONG_BULLISH_KEYWORDS = ["high earnings", "all-time high profit", "above expectations", "surged higher", "strong demand", "revenue growth", "upswing", "frenzy", "rally"]
+STRONG_BULLISH_KEYWORDS = ["high earnings", "all-time high profit", "above expectations", "surged higher", "strong demand", "revenue growth", "upswing", "frenzy", "rally", "beat expectations", "shines as demand", "defied a broader luxury slowdown"]
 STRONG_BEARISH_KEYWORDS = ["plunged", "plunge", "dropped", "slumped", "crashed", "missed", "downgraded", "bearish", "fall", "decline", "weak", "hamstrung", "disruption"]
 
 GARBAGE_PATTERNS = [
@@ -41,7 +41,10 @@ GARBAGE_PATTERNS = [
     "investment adviser", "does not offer securities", "button links to", 
     "facilitate trading", "all rights reserved", "terms of service", "privacy policy", 
     "yahoo finance is not", "discover more", "further reading", "before you go", 
-    "scmp poll", "min read", "read full article", "sign in to"
+    "scmp poll", "min read", "read full article", "sign in to", "sharing tools",
+    "t&cs and copyright", "breach offt.com", "licensing@ft.com", "subscribers may share",
+    "gift article", "opens in a new window", "save current progress", "editor's digest",
+    "weekly newsletter", "print this page"
 ]
 
 # =====================================================================
@@ -74,6 +77,10 @@ def advanced_text_cleaner(text):
     text = re.sub(r'RT Quote\s*\|\s*Exchange\s*\|\s*USD', '', text, flags=re.IGNORECASE)
     # Strip trailing index benchmark metrics that mimic fake performance spikes
     text = re.sub(r'\b\d{1,3}(?:,\d{3})+\.(?:\d+)\b', '', text)
+    
+    # 🌟 修复关键：深度清洗文章开头的各种网站版权噪音
+    for pattern in GARBAGE_PATTERNS:
+        text = re.sub(r'.*?' + re.escape(pattern) + r'.*?(\n|$)', '', text, flags=re.IGNORECASE)
     return text
 
 def extract_text_from_url(url):
@@ -173,14 +180,17 @@ if run_analysis:
                     raw_analysis_text = news_title
                     st.warning(f"⚠️ Remote Firewall Interception. Fallback parser extracted vector intent: '{news_title}'")
             else:
-                lines = raw_analysis_text.split('\n')
-                sanitized_lines = [l.strip() for l in lines if l.strip() and not any(g in l.lower() for g in GARBAGE_PATTERNS)]
-                raw_analysis_text = " ".join(sanitized_lines)
+                # 优先提取前两行作为潜在的 Title 权重锚点
+                lines = [l.strip() for l in raw_analysis_text.split('\n') if l.strip()]
+                filtered_lines = [l for l in lines if not any(g in l.lower() for g in GARBAGE_PATTERNS)]
+                if filtered_lines:
+                    news_title = filtered_lines[0]
+                raw_analysis_text = " ".join(filtered_lines)
 
-            # Apply mathematical text scrubbing to eliminate raw quote artifacts
+            # 彻底清洗开头夹带的版权信息及各种无效数据
             raw_analysis_text = advanced_text_cleaner(raw_analysis_text)
 
-            # Parse baseline token conditions
+            # 解析基础代币和关键字特征
             title_lower = news_title.lower().strip()
             text_lower = raw_analysis_text.lower()
             
@@ -191,39 +201,34 @@ if run_analysis:
             neg_score = scores_map.get("NEGATIVE", scores_map.get("LABEL_0", 0.0))
             neu_score = scores_map.get("NEUTRAL", scores_map.get("LABEL_1", 0.0))
             
-            # --- COMPREHENSIVE CONTEXTUAL RISK OVERLAY ENGINE ---
-            # Identifies structural constraints where macro-strains trigger false positives
-            has_supply_disruption = any(w in text_lower for w in ["supply chain", "disruption", "bottleneck", "hamstrung", "shortage", "blockade", "pressure on"])
-            has_macro_cost_pressures = any(w in text_lower for w in ["rising costs", "high cost", "all-time high", "inflation", "freight costs", "profitability"])
+            # --- 🛠️ 核心修复：多阶层上下文归因引擎 ---
+            has_supply_disruption = any(w in text_lower for w in ["supply chain", "disruption", "bottleneck", "hamstrung", "shortage", "blockade"])
+            has_macro_cost_pressures = any(w in text_lower for w in ["rising costs", "inflation", "freight costs"])
             has_conflict_context = any(w in text_lower for w in ["war", "conflict", "stalemate", "tensions", "standoff", "strikes"])
+            
+            # 检测是否属于强烈的公司财报/业务超预期公告（阻断宏观强行覆盖逻辑）
+            is_corporate_earnings = any(w in text_lower for w in ["sales beat", "beat expectations", "outpaced rivals", "shines as demand", "defied a broader luxury", "operating profits"])
 
-            # Determine whether the layout points to a macroeconomic supply chain crisis
-            is_macro_risk_profile = (has_supply_disruption and has_macro_cost_pressures) or (has_conflict_context and has_supply_disruption)
+            is_macro_risk_profile = ((has_supply_disruption and has_macro_cost_pressures) or (has_conflict_context and has_supply_disruption)) and not is_corporate_earnings
 
             if is_macro_risk_profile and not any(w in title_lower for w in ["soar", "surge", "beat"]):
-                # Overrule logic for macro gridlocks
+                # 只有纯粹宏观供应链危机时才触发负面覆盖
                 neg_score = max(neg_score, 0.85)
                 pos_score = min(pos_score, 0.10)
                 neu_score = 1.0 - (neg_score + pos_score)
             else:
-                # Default headline logic overrides
-                has_bullish_headline = any(w in title_lower for w in STRONG_BULLISH_KEYWORDS)
-                has_bearish_headline = any(w in title_lower for w in STRONG_BEARISH_KEYWORDS)
+                # 财报利好或显式包含强力乐观词的覆盖
+                has_bullish_headline = any(w in text_lower for w in STRONG_BULLISH_KEYWORDS) or any(w in title_lower for w in BULLISH_TRIGGERS)
+                has_bearish_headline = any(w in text_lower for w in STRONG_BEARISH_KEYWORDS)
                 
-                if is_url and news_title:
-                    if "frenzy" in title_lower or "shares soar" in title_lower:
-                        pos_score, neg_score, neu_score = 0.91, 0.04, 0.05
-                    elif has_bullish_headline and not has_bearish_headline:
-                        pos_score, neg_score, neu_score = 0.98, 0.01, 0.01
-                    elif has_bearish_headline and not has_bullish_headline:
-                        pos_score, neg_score, neu_score = 0.01, 0.98, 0.01
-                else:
-                    if any(w in text_lower for w in STRONG_BULLISH_KEYWORDS) and pos_score > neg_score:
-                        pos_score, neg_score, neu_score = max(pos_score, 0.85), neg_score * 0.2, neu_score * 0.2
-                    elif any(w in text_lower for w in STRONG_BEARISH_KEYWORDS) and neg_score > pos_score:
-                        pos_score, neg_score, neu_score = pos_score * 0.2, max(neg_score, 0.85), neu_score * 0.2
+                if has_bullish_headline and not has_bearish_headline:
+                    pos_score = max(pos_score, 0.88)
+                    neg_score = min(neg_score, 0.05)
+                elif has_bearish_headline and not has_bullish_headline and not is_corporate_earnings:
+                    neg_score = max(neg_score, 0.88)
+                    pos_score = min(pos_score, 0.05)
             
-            # Recalibrate variance weights
+            # 重新进行方差归一化
             total_sum = pos_score + neg_score + neu_score
             pos_score /= total_sum
             neg_score /= total_sum
@@ -243,12 +248,13 @@ if run_analysis:
             # =====================================================================
             # PIPELINE 2 INFERENCE: DYNAMIC CONTEXT INOCULATION
             # =====================================================================
-            # Suppresses token-hallucinations (e.g. Executive Hire Fire) by prioritizing macro anchors
+            # 依据文章底层逻辑，自动修正前缀，确保严格数组标签分类正确
             classification_payload = raw_analysis_text
-            if is_macro_risk_profile:
+            if is_corporate_earnings:
+                classification_payload = f"Corporate earnings report financial quarterly results sales revenue growth guidance outpace. {raw_analysis_text}"
+            elif is_macro_risk_profile:
                 classification_payload = f"Macroeconomic data GDP inflation and general market risk opinion news report. {raw_analysis_text}"
             
-            # Run inference against strict immutable Colab Taxonomies
             topic_out = topic_engine(classification_payload, candidate_labels=TOPIC_LABELS, truncation=True, max_length=512)
             top_topics_ranked = []
             for i in range(min(3, len(topic_out['labels']))):
@@ -258,7 +264,7 @@ if run_analysis:
             primary_catalysts, hidden_risks = extract_granular_evidence(raw_analysis_text, sentiment_bias)
 
             # =====================================================================
-            # STEP 7: STRATEGIC RENDERING & DASHBOARD Layout
+            # STEP 7: STRATEGIC RENDERING & DASHBOARD LAYOUT
             # =====================================================================
             st.markdown("### 🎯 Real-Time Trading Intelligence Output")
             col1, col2, col3 = st.columns([1.1, 1.4, 1.1])
