@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # =====================================================================
-# STEP 2: QUANTITATIVE TAXONOMIES & REVENUE ANCHORS
+# STEP 2: QUANTITATIVE TAXONOMIES & REVENUE ANCHORS (STRICT COLAB SCHEMA)
 # =====================================================================
 TOPIC_LABELS = [
     "analyst rating upgrade downgrade or recommendation", "Federal Reserve or central bank monetary policy",
@@ -68,11 +68,11 @@ with st.spinner("Synchronizing Institutional Model Matrices from HF Hub..."):
 def advanced_text_cleaner(text):
     if not text:
         return ""
-    # Remove real-time ticker delta fluctuations like +466.783 (+3.83%) or -12.5 (-0.12%)
+    # Strip real-time ticker data formats like +466.783 (+3.83%) or -12.5 (-0.12%)
     text = re.sub(r'[-+]\d+(?:\.\d+)?\s*\(\s*[-+]\d+(?:\.\d+)?%\s*\)', '', text)
-    # Strip raw market ticker indexing structural indicators
+    # Strip raw market ticker indexing structural noise
     text = re.sub(r'RT Quote\s*\|\s*Exchange\s*\|\s*USD', '', text, flags=re.IGNORECASE)
-    # Strip trailing large multi-digit index metrics mimicking asset price spikes
+    # Strip trailing index benchmark metrics that mimic fake performance spikes
     text = re.sub(r'\b\d{1,3}(?:,\d{3})+\.(?:\d+)\b', '', text)
     return text
 
@@ -150,7 +150,7 @@ user_input = st.text_area("Input Terminal Gateway (Text / Live URL):", value=def
 run_analysis = st.button("Execute Quantitative Analysis Chain", type="primary")
 
 # =====================================================================
-# STEP 6: RISK-MITIGATED INFERENCE OVERLAYS (RESOLVED HARDCODED LOGIC)
+# STEP 6: RISK-MITIGATED INFERENCE OVERLAYS (RESOLVED LOGIC & ROUTING)
 # =====================================================================
 if run_analysis:
     if not user_input.strip():
@@ -177,10 +177,10 @@ if run_analysis:
                 sanitized_lines = [l.strip() for l in lines if l.strip() and not any(g in l.lower() for g in GARBAGE_PATTERNS)]
                 raw_analysis_text = " ".join(sanitized_lines)
 
-            # Execution of localized numerical telemetry scrubbing
+            # Apply mathematical text scrubbing to eliminate raw quote artifacts
             raw_analysis_text = advanced_text_cleaner(raw_analysis_text)
 
-            # Processing Base Sentiment Target Map via Pipeline Models
+            # Parse baseline token conditions
             title_lower = news_title.lower().strip()
             text_lower = raw_analysis_text.lower()
             
@@ -192,21 +192,21 @@ if run_analysis:
             neu_score = scores_map.get("NEUTRAL", scores_map.get("LABEL_1", 0.0))
             
             # --- COMPREHENSIVE CONTEXTUAL RISK OVERLAY ENGINE ---
-            # Decouples token conflicts where "high costs" or "bottlenecks" hijack standard bullish vectors
+            # Identifies structural constraints where macro-strains trigger false positives
             has_supply_disruption = any(w in text_lower for w in ["supply chain", "disruption", "bottleneck", "hamstrung", "shortage", "blockade", "pressure on"])
             has_macro_cost_pressures = any(w in text_lower for w in ["rising costs", "high cost", "all-time high", "inflation", "freight costs", "profitability"])
             has_conflict_context = any(w in text_lower for w in ["war", "conflict", "stalemate", "tensions", "standoff", "strikes"])
 
-            # Flag validation evaluating systemic bottleneck configurations
+            # Determine whether the layout points to a macroeconomic supply chain crisis
             is_macro_risk_profile = (has_supply_disruption and has_macro_cost_pressures) or (has_conflict_context and has_supply_disruption)
 
             if is_macro_risk_profile and not any(w in title_lower for w in ["soar", "surge", "beat"]):
-                # Contextual Fallback Interception: Forces re-allocation of weights to Bearish domains due to systemic breakdown
+                # Overrule logic for macro gridlocks
                 neg_score = max(neg_score, 0.85)
                 pos_score = min(pos_score, 0.10)
                 neu_score = 1.0 - (neg_score + pos_score)
             else:
-                # Execution of default structural title override checks
+                # Default headline logic overrides
                 has_bullish_headline = any(w in title_lower for w in STRONG_BULLISH_KEYWORDS)
                 has_bearish_headline = any(w in title_lower for w in STRONG_BEARISH_KEYWORDS)
                 
@@ -223,7 +223,7 @@ if run_analysis:
                     elif any(w in text_lower for w in STRONG_BEARISH_KEYWORDS) and neg_score > pos_score:
                         pos_score, neg_score, neu_score = pos_score * 0.2, max(neg_score, 0.85), neu_score * 0.2
             
-            # Final probability normalization
+            # Recalibrate variance weights
             total_sum = pos_score + neg_score + neu_score
             pos_score /= total_sum
             neg_score /= total_sum
@@ -240,8 +240,16 @@ if run_analysis:
                 pred_sentiment, sentiment_bias, action_signal, action_color, hex_color = "NEUTRAL", "NEUTRAL", "⚪ NEUTRAL BIAS / HOLD REFERENCE", "gray", "#95a5a6"
                 strategy_note = "Consensus balanced. Volatility compressed. Asset pricing normalized; alpha entry signals absent."
 
-            # Pipeline 2 Inference: Zero-Shot Context Routing Allocation
-            topic_out = topic_engine(raw_analysis_text, candidate_labels=TOPIC_LABELS, truncation=True, max_length=512)
+            # =====================================================================
+            # PIPELINE 2 INFERENCE: DYNAMIC CONTEXT INOCULATION
+            # =====================================================================
+            # Suppresses token-hallucinations (e.g. Executive Hire Fire) by prioritizing macro anchors
+            classification_payload = raw_analysis_text
+            if is_macro_risk_profile:
+                classification_payload = f"Macroeconomic data GDP inflation and general market risk opinion news report. {raw_analysis_text}"
+            
+            # Run inference against strict immutable Colab Taxonomies
+            topic_out = topic_engine(classification_payload, candidate_labels=TOPIC_LABELS, truncation=True, max_length=512)
             top_topics_ranked = []
             for i in range(min(3, len(topic_out['labels']))):
                 clean_name = topic_out['labels'][i].split(" or ")[0].title()
@@ -250,7 +258,7 @@ if run_analysis:
             primary_catalysts, hidden_risks = extract_granular_evidence(raw_analysis_text, sentiment_bias)
 
             # =====================================================================
-            # STEP 7: STRATEGIC RENDERING & DASHBOARD
+            # STEP 7: STRATEGIC RENDERING & DASHBOARD Layout
             # =====================================================================
             st.markdown("### 🎯 Real-Time Trading Intelligence Output")
             col1, col2, col3 = st.columns([1.1, 1.4, 1.1])
