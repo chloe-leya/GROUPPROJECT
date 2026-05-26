@@ -36,7 +36,6 @@ BEARISH_TRIGGERS = ["dropped", "missed", "fell", "slumped", "decline", "negative
 STRONG_BULLISH_KEYWORDS = ["soared", "soar", "surged", "surge", "skyrocketed", "jumped", "climb", "beat", "upgraded", "frenzy", "frenzied", "rally", "rallied", "euphoria", "bullish", "strong", "growth"]
 STRONG_BEARISH_KEYWORDS = ["plunged", "plunge", "dropped", "drop", "slumped", "crashed", "missed", "downgraded", "bearish", "fall", "decline", "weak"]
 
-# Boilerplate structural noise filter array for web streaming and raw copy
 GARBAGE_PATTERNS = [
     "something went wrong", "cookie policy", "browser settings", "broker-dealer", 
     "investment adviser", "does not offer securities", "button links to", 
@@ -51,7 +50,13 @@ GARBAGE_PATTERNS = [
 @st.cache_resource
 def initialize_pipelines():
     device = 0 if torch.cuda.is_available() else -1
-    sentiment_pipe = pipeline("text-classification", model="chloeleya/finbert-fine-tuned-sentiment-model", device=device)
+    # Note: top_k=None forces the pipeline to return probabilities for ALL labels
+    sentiment_pipe = pipeline(
+        "text-classification", 
+        model="chloeleya/finbert-fine-tuned-sentiment-model", 
+        device=device,
+        top_k=None
+    )
     topic_pipe = pipeline("zero-shot-classification", model="facebook/bart-large-mnli", device=device)
     return sentiment_pipe, topic_pipe
 
@@ -158,35 +163,57 @@ if run_analysis:
                     raw_analysis_text = news_title
                     st.warning(f"⚠️ Remote Firewall Interception. Fallback parser extracted vector intent: '{news_title}'")
             else:
-                # Sanitizing manual copy-paste text streams from structural web junk
                 lines = raw_analysis_text.split('\n')
                 sanitized_lines = [l.strip() for l in lines if l.strip() and not any(g in l.lower() for g in GARBAGE_PATTERNS)]
                 raw_analysis_text = " ".join(sanitized_lines)
 
-            # Execution Layer for Sentiment Routing Array
+            # Processing Full Sentiment Probability Vector
             title_lower = news_title.lower().strip()
             has_bullish_headline = any(w in title_lower for w in STRONG_BULLISH_KEYWORDS)
             has_bearish_headline = any(w in title_lower for w in STRONG_BEARISH_KEYWORDS)
             
-            base_out = sentiment_engine(raw_analysis_text, truncation=True, max_length=512)[0]
-            pred_sentiment = base_out['label'].upper().strip()
-            senti_score = base_out['score']
+            # Returns sorted list of all classes based on configurations in Step 3
+            sentiment_outputs = sentiment_engine(raw_analysis_text, truncation=True, max_length=512)[0]
             
+            # Map out scores into a standard clean dict map
+            scores_map = {item['label'].upper().strip(): item['score'] for item in sentiment_outputs}
+            
+            # Resolve legacy variant names from custom fine-tuned model topologies
+            pos_score = scores_map.get("POSITIVE", scores_map.get("LABEL_2", 0.0))
+            neg_score = scores_map.get("NEGATIVE", scores_map.get("LABEL_0", 0.0))
+            neu_score = scores_map.get("NEUTRAL", scores_map.get("LABEL_1", 0.0))
+            
+            # Dynamic heuristic corrections based on title override matrices
             if is_url and news_title:
-                title_out = sentiment_engine(news_title, truncation=True, max_length=512)[0]
-                t_label = title_out['label'].upper().strip()
-                
                 if "frenzy" in title_lower or "shares soar" in title_lower:
-                    pred_sentiment, senti_score = "POSITIVE", 0.91
+                    pos_score, neg_score, neu_score = 0.91, 0.04, 0.05
                 elif has_bullish_headline and not has_bearish_headline:
-                    pred_sentiment, senti_score = "POSITIVE", max(title_out['score'], 0.98)
+                    pos_score, neg_score, neu_score = 0.98, 0.01, 0.01
                 elif has_bearish_headline and not has_bullish_headline:
-                    pred_sentiment, senti_score = "NEGATIVE", max(title_out['score'], 0.98)
-                elif ("POS" in t_label or t_label == "POSITIVE") and title_out['score'] > 0.70:
-                    pred_sentiment, senti_score = "POSITIVE", title_out['score']
+                    pos_score, neg_score, neu_score = 0.01, 0.98, 0.01
             else:
-                if any(w in raw_analysis_text.lower() for w in STRONG_BULLISH_KEYWORDS): pred_sentiment = "POSITIVE"
-                elif any(w in raw_analysis_text.lower() for w in STRONG_BEARISH_KEYWORDS): pred_sentiment = "NEGATIVE"
+                if any(w in raw_analysis_text.lower() for w in STRONG_BULLISH_KEYWORDS):
+                    pos_score, neg_score, neu_score = max(pos_score, 0.85), neg_score * 0.2, neu_score * 0.2
+                elif any(w in raw_analysis_text.lower() for w in STRONG_BEARISH_KEYWORDS):
+                    pos_score, neg_score, neu_score = pos_score * 0.2, max(neg_score, 0.85), neu_score * 0.2
+            
+            # Normalize tracking vectors back to a uniform 100% total allocation
+            total_sum = pos_score + neg_score + neu_score
+            pos_score /= total_sum
+            neg_score /= total_sum
+            neu_score /= total_sum
+
+            # Determine dominant label for operational switching
+            max_score = max(pos_score, neg_score, neu_score)
+            if max_score == pos_score:
+                pred_sentiment, sentiment_bias, action_signal, action_color = "POSITIVE", "BULLISH", "🟢 BULLISH BIAS / LONG REFERENCE", "green"
+                strategy_note = "High probability upward momentum. Favorable window for programmatic asset accumulation or call placement."
+            elif max_score == neg_score:
+                pred_sentiment, sentiment_bias, action_signal, action_color = "NEGATIVE", "BEARISH", "🔴 BEARISH BIAS / SHORT REFERENCE", "red"
+                strategy_note = "Downside risk asset drift active. Tactical hedging overlays or short equity allocation advised."
+            else:
+                pred_sentiment, sentiment_bias, action_signal, action_color = "NEUTRAL", "NEUTRAL", "⚪ NEUTRAL BIAS / HOLD REFERENCE", "gray"
+                strategy_note = "Consensus balanced. Volatility compressed. Asset pricing normalized; alpha entry signals absent."
 
             # Pipeline 2 Inference: Context Routing Allocation
             topic_out = topic_engine(raw_analysis_text, candidate_labels=TOPIC_LABELS, truncation=True, max_length=512)
@@ -195,32 +222,34 @@ if run_analysis:
                 clean_name = topic_out['labels'][i].split(" or ")[0].title()
                 top_topics_ranked.append({"topic": clean_name, "confidence": topic_out['scores'][i]})
             
-            # Context Signal Translation Logic
-            if "POS" in pred_sentiment or pred_sentiment == "POSITIVE":
-                sentiment_bias, action_signal, action_color = "BULLISH", "🟢 BULLISH BIAS / LONG REFERENCE", "green"
-                strategy_note = "High probability upward momentum. Favorable window for programmatic asset accumulation or call placement."
-            elif "NEG" in pred_sentiment or pred_sentiment == "NEGATIVE":
-                sentiment_bias, action_signal, action_color = "BEARISH", "🔴 BEARISH BIAS / SHORT REFERENCE", "red"
-                strategy_note = "Downside risk asset drift active. Tactical hedging overlays or short equity allocation advised."
-            else:
-                sentiment_bias, action_signal, action_color = "NEUTRAL", "⚪ NEUTRAL BIAS / HOLD REFERENCE", "gray"
-                strategy_note = "Consensus balanced. Volatility compressed. Asset pricing normalized; alpha entry signals absent."
-
             primary_catalysts, hidden_risks = extract_granular_evidence(raw_analysis_text, sentiment_bias)
 
             # =====================================================================
             # STEP 7: STRATEGIC RENDERING & DASHBOARD
             # =====================================================================
             st.markdown("### 🎯 Real-Time Trading Intelligence Output")
-            col1, col2, col3 = st.columns([1.2, 1, 1.2])
+            col1, col2, col3 = st.columns([1.2, 1.3, 1.2])
             
             with col1:
                 st.markdown("**Ranked Context Distribution (Top 3):**")
                 for idx, item in enumerate(top_topics_ranked):
                     st.markdown(f"**Rank {idx+1}:** {item['topic']} `({item['confidence']:.2%})`")
+            
             with col2:
-                st.metric(label="Fine-Tuned Market Sentiment", value="POSITIVE" if sentiment_bias=="BULLISH" else ("NEGATIVE" if sentiment_bias=="BEARISH" else "NEUTRAL"))
-                st.caption(f"Sentiment Confidence: {senti_score:.2%}")
+                st.markdown("**Fine-Tuned Market Sentiment Matrix:**")
+                # Highlight the primary sentiment cleanly using native standard elements
+                st.markdown(f"Dominant Bias: **{pred_sentiment}** *(Confidence: {max_score:.2%})*")
+                
+                # Render clean progress distributions maps
+                st.caption(f"Positive Variance Allocation: {pos_score:.2%}")
+                st.progress(float(pos_score))
+                
+                st.caption(f"Neutral Variance Allocation: {neu_score:.2%}")
+                st.progress(float(neu_score))
+                
+                st.caption(f"Negative Variance Allocation: {neg_score:.2%}")
+                st.progress(float(neg_score))
+                
             with col3:
                 st.markdown(f"**Actionable Trading Bias:**\n### :{action_color}[{action_signal}]")
             
