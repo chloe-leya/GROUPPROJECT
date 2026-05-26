@@ -36,6 +36,15 @@ BEARISH_TRIGGERS = ["dropped", "missed", "fell", "slumped", "decline", "negative
 STRONG_BULLISH_KEYWORDS = ["soared", "soar", "surged", "surge", "skyrocketed", "jumped", "climb", "beat", "upgraded", "frenzy", "frenzied", "rally", "rallied", "euphoria", "bullish", "strong", "growth"]
 STRONG_BEARISH_KEYWORDS = ["plunged", "plunge", "dropped", "drop", "slumped", "crashed", "missed", "downgraded", "bearish", "fall", "decline", "weak"]
 
+# Boilerplate structural noise filter array for web streaming and raw copy
+GARBAGE_PATTERNS = [
+    "something went wrong", "cookie policy", "browser settings", "broker-dealer", 
+    "investment adviser", "does not offer securities", "button links to", 
+    "facilitate trading", "all rights reserved", "terms of service", "privacy policy", 
+    "yahoo finance is not", "discover more", "further reading", "before you go", 
+    "scmp poll", "min read", "read full article", "sign in to"
+]
+
 # =====================================================================
 # STEP 3: ASYNCHRONOUS PIPELINE LIFECYCLE
 # =====================================================================
@@ -70,7 +79,7 @@ def extract_text_from_url(url):
         body_text_list = []
         for p in paragraphs:
             text_block = p.get_text().strip()
-            if len(text_block) > 30 and not any(x in text_block.lower() for x in ["something went wrong", "cookie policy", "browser settings"]):
+            if len(text_block) > 35 and not any(g in text_block.lower() for g in GARBAGE_PATTERNS):
                 body_text_list.append(text_block)
                 
         return title, " ".join(body_text_list[:4])
@@ -95,7 +104,7 @@ def extract_granular_evidence(text, primary_bias):
 
     for sentence in sentences:
         s_clean = sentence.strip()
-        if len(s_clean) < 25 or any(x in s_clean.lower() for x in ["yahoo finance", "sign in", "zacks"]):
+        if len(s_clean) < 25 or any(g in s_clean.lower() for g in GARBAGE_PATTERNS):
             continue
         if any(t in s_clean.lower() for t in primary_tokens) and len(primary_evidence) < 2:
             if s_clean not in primary_evidence: primary_evidence.append(s_clean)
@@ -104,7 +113,7 @@ def extract_granular_evidence(text, primary_bias):
                 
     if not primary_evidence and sentences:
         for s in sentences:
-            if len(s.strip()) > 40:
+            if len(s.strip()) > 40 and not any(g in s.lower() for g in GARBAGE_PATTERNS):
                 primary_evidence.append(s.strip())
                 break
     return primary_evidence, opposing_evidence
@@ -117,7 +126,6 @@ st.markdown("---")
 
 st.subheader("Financial Intelligence Input Gateway")
 
-# Operational Advisory to steer users away from unstable scraping pipelines
 st.info("💡 **Operational Guidance:** Directly **copy and paste raw text context** or transcript feeds below for maximum statistical inference accuracy. Target network nodes (e.g., Yahoo Finance) consistently employ erratic anti-scraping firewalls that degrade remote payload telemetry.")
 
 placeholder_msg = "Paste regulatory wires, corporate text copies, or market tweets here..."
@@ -146,12 +154,16 @@ if run_analysis:
                     with st.expander("Scraped Telemetry Payload"):
                         st.write(raw_analysis_text)
                 else:
-                    # Activate parsing fallback mapping under anti-scraping firewall
                     news_title = extract_fallback_title(user_input.strip())
                     raw_analysis_text = news_title
                     st.warning(f"⚠️ Remote Firewall Interception. Fallback parser extracted vector intent: '{news_title}'")
+            else:
+                # Sanitizing manual copy-paste text streams from structural web junk
+                lines = raw_analysis_text.split('\n')
+                sanitized_lines = [l.strip() for l in lines if l.strip() and not any(g in l.lower() for g in GARBAGE_PATTERNS)]
+                raw_analysis_text = " ".join(sanitized_lines)
 
-            # Token-truncated validation layer preventing 512 embedding RuntimeError sequence
+            # Execution Layer for Sentiment Routing Array
             title_lower = news_title.lower().strip()
             has_bullish_headline = any(w in title_lower for w in STRONG_BULLISH_KEYWORDS)
             has_bearish_headline = any(w in title_lower for w in STRONG_BEARISH_KEYWORDS)
@@ -173,8 +185,8 @@ if run_analysis:
                 elif ("POS" in t_label or t_label == "POSITIVE") and title_out['score'] > 0.70:
                     pred_sentiment, senti_score = "POSITIVE", title_out['score']
             else:
-                if any(w in user_input.lower() for w in STRONG_BULLISH_KEYWORDS): pred_sentiment = "POSITIVE"
-                elif any(w in user_input.lower() for w in STRONG_BEARISH_KEYWORDS): pred_sentiment = "NEGATIVE"
+                if any(w in raw_analysis_text.lower() for w in STRONG_BULLISH_KEYWORDS): pred_sentiment = "POSITIVE"
+                elif any(w in raw_analysis_text.lower() for w in STRONG_BEARISH_KEYWORDS): pred_sentiment = "NEGATIVE"
 
             # Pipeline 2 Inference: Context Routing Allocation
             topic_out = topic_engine(raw_analysis_text, candidate_labels=TOPIC_LABELS, truncation=True, max_length=512)
@@ -214,17 +226,18 @@ if run_analysis:
             
             st.markdown("---")
             
-            # Restored Granular Telemetry Blocks
             col_left, col_right = st.columns(2)
             with col_left:
                 st.subheader("🔍 Core Supporting Market Triggers")
                 st.markdown("Specific statements driving the primary AI market sentiment output:")
-                for catalyst in primary_catalysts:
-                    st.markdown(f"> ✅ *\"... {catalyst} ...\"*")
+                if primary_catalysts:
+                    for catalyst in primary_catalysts:
+                        st.markdown(f"> ✅ *\"... {catalyst} ...\"*")
+                else:
+                    st.markdown("> *No structural catalyst statements isolated.*")
             with col_right:
                 st.subheader("⚠️ Dual-Force Risk Audit")
                 if hidden_risks:
-                    st.markdown("Warning: The system isolated the following **opposing risk factors** within the wire context:")
                     for risk in hidden_risks:
                         st.markdown(f"> ❌ *\"... {risk} ...\"*")
                 else:
