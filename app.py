@@ -17,7 +17,6 @@ st.set_page_config(
 # =====================================================================
 # STEP 2: FIXED BUSINESS ANCHORS & LEXICONS (GLOBAL SCOPE)
 # =====================================================================
-# Defined globally so the system can compile uninterrupted
 TOPIC_LABELS = [
     "analyst rating upgrade downgrade or recommendation", "Federal Reserve or central bank monetary policy",
     "company news or product launch announcement", "corporate bonds treasury or debt market",
@@ -31,7 +30,7 @@ TOPIC_LABELS = [
     "stock analysis investor opinion or commentary", "stock price movement rise fall or volatility"
 ]
 
-BULLISH_TRIGGERS = ["surged", "beat", "growth", "jumped", "positive", "highest", "record", "demand", "upgrade", "gained", "climb", "bullish"]
+BULLISH_TRIGGERS = ["surged", "beat", "growth", "jumped", "positive", "highest", "record", "demand", "upgrade", "gained", "climb", "bullish", "rose"]
 BEARISH_TRIGGERS = ["dropped", "missed", "fell", "slumped", "decline", "negative", "loss", "risk", "downgrade", "warned", "plunged", "deficit", "bearish", "constraint", "slowdown"]
 
 # ==========================================
@@ -73,15 +72,13 @@ def extract_text_from_url(url):
             html = response.read()
         
         soup = BeautifulSoup(html, 'html.parser')
-        title = soup.find('h1').get_text() if soup.find('h1') else ""
+        title = soup.find('h1').get_text().strip() if soup.find('h1') else ""
         paragraphs = soup.find_all('p')
         body_text = " ".join([p.get_text() for p in paragraphs[:4]])
         
-        combined_text = f"{title}. {body_text}"
-        cleaned_text = re.sub(r'\s+', ' ', combined_text).strip()
-        return cleaned_text if len(cleaned_text) > 20 else None
+        return title, body_text
     except Exception:
-        return None
+        return None, None
 
 def extract_granular_evidence(text, primary_bias):
     sentences = re.split(r'(?<=[.!?])\s+', text)
@@ -122,10 +119,10 @@ st.markdown("---")
 st.subheader("Financial News & Intelligence Input Portal")
 st.markdown("*System auto-detects input format. Supports raw news copy, market tweets, or live news URLs (e.g., Yahoo Finance).*")
 
-default_text = "https://finance.yahoo.com/news/nvidia-earnings-revenue-q3-2025-212015632.html"
+default_text = "https://finance.yahoo.com/news/stocks-and-earnings-surge-and-iran-deal-may-be-imminent-what-to-watch-this-week-114338066.html"
 user_input = st.text_area("Input Terminal Gateway (Text/URL):", value=default_text, height=90)
 
-# The primary calculation trigger button (Safely rendered outside block logic)
+# 确保触发按钮安全地渲染在输入框下方
 run_analysis = st.button("Generate Trading Intelligence Reference", type="primary")
 
 # =====================================================================
@@ -138,22 +135,44 @@ if run_analysis:
         with st.spinner("Executing real-time multi-pipeline analytical sequence..."):
             
             is_url = user_input.strip().startswith(("http://", "https://"))
-            analysis_text = user_input
+            raw_analysis_text = user_input
+            news_title = ""
             
             if is_url:
                 st.info("🌐 URL Gateway active. Parsing text from remote node...")
-                scraped_text = extract_text_from_url(user_input.strip())
-                if scraped_text:
-                    analysis_text = scraped_text
+                scraped_title, scraped_body = extract_text_from_url(user_input.strip())
+                if scraped_title or scraped_body:
+                    news_title = scraped_title
+                    raw_analysis_text = f"{scraped_title}. {scraped_body}"
                     with st.expander("See Scraped News Context"):
-                        st.write(analysis_text)
+                        st.write(raw_analysis_text)
                 else:
                     st.error("URL Extraction restricted by target firewall. Advancing via raw string fallback mapping.")
 
-            # Pipeline 1 Inference: Fine-tuned Sentiment System
-            senti_out = sentiment_engine(analysis_text)[0]
-            pred_sentiment = senti_out['label'].upper()
-            senti_score = senti_out['score']
+            # =========================================================
+            # 🔥 DATA CLEANING & TITLE BOOSTING MATRIX
+            # =========================================================
+            # 1. 用正则表达式将文本和标题中所有的具体数字替换为 [NUM]，消除非正常的数值漂移和噪音
+            analysis_text = re.sub(r'\d+(,\d+)*', '[NUM]', raw_analysis_text)
+            clean_title = re.sub(r'\d+(,\d+)*', '[NUM]', news_title) if news_title else ""
+            
+            # 2. 多模型决策加权层
+            if is_url and clean_title:
+                # 分别对清洗后的“纯标题”和“全文本”运行情感分析
+                title_out = sentiment_engine(clean_title)[0]
+                full_out = sentiment_engine(analysis_text)[0]
+                
+                # 黄金法则：如果标题展现出大于 85% 的极强情感方向，强制采用标题结论，防止长文本噪音稀释
+                if title_out['label'] != full_out['label'] and title_out['score'] > 0.85:
+                    pred_sentiment = title_out['label'].upper()
+                    senti_score = title_out['score']
+                else:
+                    pred_sentiment = full_out['label'].upper()
+                    senti_score = full_out['score']
+            else:
+                senti_out = sentiment_engine(analysis_text)[0]
+                pred_sentiment = senti_out['label'].upper()
+                senti_score = senti_out['score']
             
             # Pipeline 2 Inference: Zero-shot Topic Space Router
             topic_out = topic_engine(analysis_text, candidate_labels=TOPIC_LABELS, truncation=True, max_length=512)
@@ -161,12 +180,12 @@ if run_analysis:
             topic_score = topic_out['scores'][0]
             
             # Execute Business Decision Translation Logic
-            if "POS" in pred_sentiment:
+            if "POS" in pred_sentiment or "BULLISH" in pred_sentiment:
                 sentiment_bias = "BULLISH"
                 action_signal = "🟢 BULLISH BIAS / LONG REFERENCE"
                 action_color = "green"
                 strategy_note = "High probability upward momentum. Favorable window for programmatic asset accumulation or call placement."
-            elif "NEG" in pred_sentiment:
+            elif "NEG" in pred_sentiment or "BEARISH" in pred_sentiment:
                 sentiment_bias = "BEARISH"
                 action_signal = "🔴 BEARISH BIAS / SHORT REFERENCE"
                 action_color = "red"
@@ -204,14 +223,17 @@ if run_analysis:
                 st.subheader("🔍 Core Supporting Market Triggers")
                 st.markdown("Specific statements driving the primary AI market sentiment output:")
                 for catalyst in primary_catalysts:
-                    st.markdown(f"> ✅ *\"... {catalyst} ...\"*")
+                    # 将高亮的 [NUM] 还原为符合可读性的叙述
+                    readable_catalyst = catalyst.replace('[NUM]', '[数值]')
+                    st.markdown(f"> ✅ *\"... {readable_catalyst} ...\"*")
             
             with col_right:
                 st.subheader("⚠️ Dual-Force Risk Audit")
                 if hidden_risks:
                     st.markdown("Warning: The system isolated the following **opposing risk factors** within the wire context:")
                     for risk in hidden_risks:
-                        st.markdown(f"> ❌ *\"... {risk} ...\"*")
+                        readable_risk = risk.replace('[NUM]', '[数值]')
+                        st.markdown(f"> ❌ *\"... {readable_risk} ...\"*")
                 else:
                     st.success("No meaningful counter-sentiment lexical anomalies or opposing structural risk statements detected.")
             
