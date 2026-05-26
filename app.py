@@ -115,17 +115,19 @@ def extract_granular_evidence(text, primary_bias):
         primary_tokens, opposing_tokens = BULLISH_TRIGGERS, BEARISH_TRIGGERS
     elif primary_bias == "BEARISH":
         primary_tokens, opposing_tokens = BEARISH_TRIGGERS, BULLISH_TRIGGERS
-    else:
-        primary_tokens, opposing_tokens = ["expected", "unchanged", "remained", "flat"], []
+    else:  # NEUTRAL → treat bullish as primary, bearish as opposing
+        primary_tokens, opposing_tokens = BULLISH_TRIGGERS, BEARISH_TRIGGERS
 
     for sentence in sentences:
         s_clean = sentence.strip()
         if len(s_clean) < 25 or any(g in s_clean.lower() for g in GARBAGE_PATTERNS):
             continue
         if any(t in s_clean.lower() for t in primary_tokens) and len(primary_evidence) < 2:
-            if s_clean not in primary_evidence: primary_evidence.append(s_clean)
+            if s_clean not in primary_evidence:
+                primary_evidence.append(s_clean)
         if opposing_tokens and any(t in s_clean.lower() for t in opposing_tokens) and len(opposing_evidence) < 1:
-            if s_clean not in primary_evidence and s_clean not in opposing_evidence: opposing_evidence.append(s_clean)
+            if s_clean not in primary_evidence and s_clean not in opposing_evidence:
+                opposing_evidence.append(s_clean)
                 
     if not primary_evidence and sentences:
         for s in sentences:
