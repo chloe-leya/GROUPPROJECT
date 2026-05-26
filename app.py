@@ -146,7 +146,7 @@ st.subheader("Financial Intelligence Input Gateway")
 st.info("💡 **Operational Guidance:** Copy and paste raw macroeconomic or equity transcripts below. The architecture utilizes localized telemetry filtering to decouple market noise and ticker artifacts prior to neural inference.")
 
 placeholder_msg = "Paste regulatory wires, corporate text copies, or market tweets here..."
-default_context = "NVIDIA Reinforces Bullish Outlook as AI Accelerators Demand Surges. Data center revenue remained the key growth engine, powered by demand for Nvidia's GPUs and AI accelerators."
+default_context = "NVIDIA Reinforces Bullish Outlook as AI Accelerators Demand Surges. Data center revenue remained the key growth engine, powered by demand for Nvidia's GPUs and AI accelerators. Companies developing large language models (LLMs), generative AI applications, and advanced computing systems continue to rely heavily on Nvidia hardware."
 
 user_input = st.text_area("Input Terminal Gateway (Text / Live URL):", value=default_context, placeholder=placeholder_msg, height=120)
 run_analysis = st.button("Execute Quantitative Analysis Chain", type="primary")
