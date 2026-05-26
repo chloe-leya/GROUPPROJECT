@@ -216,5 +216,138 @@ if run_analysis:
                 sanitized_lines = [l.strip() for l in lines if l.strip() and not any(g in l.lower() for g in GARBAGE_PATTERNS)]
                 raw_analysis_text = " ".join(sanitized_lines)
 
-            # Scrub incoming dataset
-            raw_analysis_text = advanced_text
+            # Scrub incoming dataset - FIXED HERE
+            raw_analysis_text = advanced_text_cleaner(raw_analysis_text)
+
+            title_lower = news_title.lower().strip()
+            text_lower = raw_analysis_text.lower()
+            
+            sentiment_outputs = sentiment_engine(raw_analysis_text, truncation=True, max_length=512)[0]
+            scores_map = {item['label'].upper().strip(): item['score'] for item in sentiment_outputs}
+            
+            pos_score = scores_map.get("POSITIVE", scores_map.get("LABEL_2", 0.0))
+            neg_score = scores_map.get("NEGATIVE", scores_map.get("LABEL_0", 0.0))
+            neu_score = scores_map.get("NEUTRAL", scores_map.get("LABEL_1", 0.0))
+            
+            # Extract ranked topics first to inform contextual rule filtering
+            topic_out = topic_engine(raw_analysis_text, candidate_labels=TOPIC_LABELS, truncation=True, max_length=512)
+            top_topics_ranked = []
+            for i in range(min(3, len(topic_out['labels']))):
+                clean_name = topic_out['labels'][i].split(" or ")[0].title()
+                top_topics_ranked.append({"topic": clean_name, "confidence": topic_out['scores'][i]})
+
+            # --- 🛠️ RECONFIGURED: Context-Aware Dynamic Risk Matrix ---
+            has_supply_disruption = any(w in text_lower for w in ["supply chain", "disruption", "bottleneck", "hamstrung", "shortage", "blockade"])
+            has_macro_cost_pressures = any(w in text_lower for w in ["rising costs", "inflation", "freight costs", "pressure on"])
+            has_conflict_context = any(w in text_lower for w in ["war", "conflict", "stalemate", "tensions", "standoff", "strikes"])
+
+            is_earnings = len(top_topics_ranked) > 0 and top_topics_ranked[0]['topic'] == "Earnings Report"
+            model_is_strongly_bullish = pos_score > 0.65
+
+            # Dynamic Thresholding: Macro disruptions ONLY override if the neural engine isn't overwhelmingly certain of a fundamental micro-shining event
+            if (has_conflict_context and has_supply_disruption) or (has_supply_disruption and has_macro_cost_pressures):
+                if is_earnings and model_is_strongly_bullish:
+                    # Contextual Exception: blowout earnings beat defers macro risks; allow alpha expression but account for premium volatility
+                    pos_score = max(pos_score, 0.75)
+                    neg_score = min(neg_score, 0.15)
+                    neu_score = 1.0 - (neg_score + pos_score)
+                else:
+                    # Regular Overrule: general news lacking strong micro performance defaults to strict safety protocol
+                    neg_score = max(neg_score, 0.88)
+                    pos_score = min(pos_score, 0.06)
+                    neu_score = 1.0 - (neg_score + pos_score)
+            else:
+                # Regular Keyword Filters (Fallback Boosters)
+                if any(w in text_lower for w in STRONG_BULLISH_KEYWORDS):
+                    pos_score, neg_score = max(pos_score, 0.85), min(neg_score, 0.10)
+                elif any(w in text_lower for w in STRONG_BEARISH_KEYWORDS):
+                    neg_score, pos_score = max(neg_score, 0.85), min(pos_score, 0.10)
+            
+            # Probability Normalization
+            total_sum = pos_score + neg_score + neu_score
+            pos_score /= total_sum
+            neg_score /= total_sum
+            neu_score /= total_sum
+
+            max_score = max(pos_score, neg_score, neu_score)
+            if max_score == pos_score:
+                pred_sentiment, sentiment_bias, action_signal, action_color, hex_color = "POSITIVE", "BULLISH", "🟢 BULLISH BIAS / LONG REFERENCE", "green", "#2ecc71"
+                strategy_note = "High probability upward momentum. Favorable window for programmatic asset accumulation or call placement."
+            elif max_score == neg_score:
+                pred_sentiment, sentiment_bias, action_signal, action_color, hex_color = "NEGATIVE", "BEARISH", "🔴 BEARISH BIAS / SHORT REFERENCE", "red", "#e74c3c"
+                strategy_note = "Downside risk asset drift active. Tactical hedging overlays or short equity allocation advised."
+            else:
+                pred_sentiment, sentiment_bias, action_signal, action_color, hex_color = "NEUTRAL", "NEUTRAL", "⚪ NEUTRAL BIAS / HOLD REFERENCE", "gray", "#95a5a6"
+                strategy_note = "Consensus balanced. Volatility compressed. Asset pricing normalized; alpha entry signals absent."
+
+            primary_catalysts, hidden_risks = extract_granular_evidence(raw_analysis_text, sentiment_bias)
+
+            # =====================================================================
+            # STEP 7: STRATEGIC RENDERING & DASHBOARD
+            # =====================================================================
+            st.markdown("### 🎯 Real-Time Trading Intelligence Output")
+            col1, col2, col3 = st.columns([1.1, 1.4, 1.1])
+            
+            with col1:
+                st.markdown("**Ranked Context Distribution:**")
+                r1_name = top_topics_ranked[0]['topic']
+                r2_name = top_topics_ranked[1]['topic']
+                r3_name = top_topics_ranked[2]['topic']
+                
+                r1_conf_txt = f"{top_topics_ranked[0]['confidence']:.2%}"
+                r2_conf_txt = f"{top_topics_ranked[1]['confidence']:.2%}"
+                r3_conf_txt = f"{top_topics_ranked[2]['confidence']:.2%}"
+                
+                st.markdown(f"### 🥇 {r1_name} `({r1_conf_txt})`")
+                st.markdown(f"#### 🥈 {r2_name} `({r2_conf_txt})`")
+                st.markdown(f"##### 🥉 {r3_name} `({r3_conf_txt})`")
+            
+            with col2:
+                st.markdown("**Fine-Tuned Market Sentiment Matrix:**")
+                max_score_txt = f"{max_score:.2%}"
+                pos_score_txt = f"Positive Variance Allocation: {pos_score:.2%}"
+                neu_score_txt = f"Neutral Variance Allocation: {neu_score:.2%}"
+                neg_score_txt = f"Negative Variance Allocation: {neg_score:.2%}"
+                
+                st.html(f"""
+                    <div style="background-color:rgba(255,255,255,0.05); padding:12px; border-left:6px solid {hex_color}; border-radius:4px; margin-bottom:10px;">
+                        <span style="font-size:13px; text-transform:uppercase; color:#888; display:block; font-weight:bold;">Dominant Market Bias</span>
+                        <span style="font-size:40px; font-weight:900; color:{hex_color}; line-height:1;">{pred_sentiment}</span>
+                        <span style="font-size:18px; font-weight:700; color:#aaa; margin-left:8px;">({max_score_txt})</span>
+                    </div>
+                """)
+                
+                st.caption(pos_score_txt)
+                st.progress(float(pos_score))
+                
+                st.caption(neu_score_txt)
+                st.progress(float(neu_score))
+                
+                st.caption(neg_score_txt)
+                st.progress(float(neg_score))
+                
+            with col3:
+                st.markdown(f"**Actionable Trading Bias:**\n### :{action_color}[{action_signal}]")
+            
+            st.markdown("---")
+            
+            col_left, col_right = st.columns(2)
+            with col_left:
+                st.subheader("🔍 Core Supporting Market Triggers")
+                st.markdown("Specific statements driving the primary AI market sentiment output:")
+                if primary_catalysts:
+                    for catalyst in primary_catalysts:
+                        st.markdown(f"> ✅ *\"... {catalyst} ...\"*")
+                else:
+                    st.markdown("> *No structural catalyst statements isolated.*")
+            with col_right:
+                st.subheader("⚠️ Dual-Force Risk Audit")
+                if hidden_risks:
+                    for risk in hidden_risks:
+                        st.markdown(f"> ❌ *\"... {risk} ...\"*")
+                else:
+                    st.success("No meaningful counter-sentiment lexical anomalies or opposing structural risk statements detected.")
+            
+            st.markdown("---")
+            st.subheader("💡 Quantitative Risk & Strategy Reference")
+            st.info(f"**Strategic Guidance:** {strategy_note}\n\n*Disclaimer: This output serves as a quantitative data layer for institutional workflows. It does not constitute investment advice.*")
