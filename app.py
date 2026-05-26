@@ -33,8 +33,8 @@ TOPIC_LABELS = [
 BULLISH_TRIGGERS = ["surged", "beat", "growth", "jumped", "positive", "highest", "record", "demand", "upgrade", "gained", "climb", "bullish", "rose", "soared", "soar", "high", "above"]
 BEARISH_TRIGGERS = ["dropped", "missed", "fell", "slumped", "decline", "negative", "loss", "risk", "downgrade", "warned", "plunged", "deficit", "bearish", "constraint", "slowdown", "down"]
 
-STRONG_BULLISH_HEADLINE_KEYWORDS = ["soared", "soar", "surged", "surge", "skyrocketed", "jumped", "climb", "beat", "upgraded", "frenzy", "frenzied", "rally", "rallied", "euphoria"]
-STRONG_BEARISH_HEADLINE_KEYWORDS = ["plunged", "plunge", "dropped", "drop", "slumped", "crashed", "missed", "downgraded"]
+STRONG_BULLISH_HEADLINE_KEYWORDS = ["soared", "soar", "surged", "surge", "skyrocketed", "jumped", "climb", "beat", "upgraded", "frenzy", "frenzied", "rally", "rallied", "euphoria", "bullish"]
+STRONG_BEARISH_HEADLINE_KEYWORDS = ["plunged", "plunge", "dropped", "drop", "slumped", "crashed", "missed", "downgraded", "bearish"]
 
 # ==========================================
 # STEP 3: CACHED MODEL INITIALIZATION MATRIX
@@ -138,7 +138,7 @@ st.markdown("---")
 st.subheader("Financial News & Intelligence Input Portal")
 st.markdown("*System auto-detects input format. Supports raw news copy, market tweets, or live news URLs (e.g., Yahoo Finance).*")
 
-default_text = "https://finance.yahoo.com/markets/stocks/articles/dell-stock-soared-over-130-091719505.html"
+default_text = "https://finance.yahoo.com/markets/stocks/articles/nvidia-reinforces-bullish-outlook-strong-191300901.html"
 user_input = st.text_area("Input Terminal Gateway (Text/URL):", value=default_text, height=90)
 
 run_analysis = st.button("Generate Trading Intelligence Reference", type="primary")
@@ -167,33 +167,28 @@ if run_analysis:
                 else:
                     st.error("URL Extraction restricted by target firewall. Advancing via raw string fallback mapping.")
 
-            # =========================================================
-            # 🔥 DATA CLEANING & ENHANCED TITLE ROUTING MATRIX
-            # =========================================================
-            clean_analysis_text = re.sub(r'\d+(,\d+)*', '[NUM]', raw_analysis_text)
-            clean_title = re.sub(r'\d+(,\d+)*', '[NUM]', news_title) if news_title else ""
-            
+            # =================================================================
+            # 🔥 ZERO TRANSLATION INTERFERENCE MATRIX (REMOVED [NUM] DISTORTION)
+            # =================================================================
             title_lower = news_title.lower().strip()
             has_strong_bullish_headline = any(w in title_lower for w in STRONG_BULLISH_HEADLINE_KEYWORDS)
             has_strong_bearish_headline = any(w in title_lower for w in STRONG_BEARISH_HEADLINE_KEYWORDS)
             
-            if is_url and clean_title:
-                title_out = sentiment_engine(clean_title)[0]
-                full_out = sentiment_engine(clean_analysis_text)[0]
+            if is_url and news_title:
+                title_out = sentiment_engine(news_title)[0]
+                full_out = sentiment_engine(raw_analysis_text)[0]
                 
                 t_label = title_out['label'].upper().strip()
                 f_label = full_out['label'].upper().strip()
                 
-                if "frenzy" in title_lower or "shares soar" in title_lower:
+                # Heuristic Rule 1: Structural Headline Rule Reinforcement
+                if has_strong_bullish_headline and not has_strong_bearish_headline:
                     pred_sentiment = "POSITIVE"
-                    senti_score = 0.91
-                elif has_strong_bullish_headline and not has_strong_bearish_headline:
-                    pred_sentiment = "POSITIVE"
-                    senti_score = max(title_out['score'], 0.95)
+                    senti_score = max(title_out['score'], 0.98)
                 elif has_strong_bearish_headline and not has_strong_bullish_headline:
                     pred_sentiment = "NEGATIVE"
-                    senti_score = max(title_out['score'], 0.95)
-                elif ("POS" in t_label or t_label == "POSITIVE") and title_out['score'] > 0.75:
+                    senti_score = max(title_out['score'], 0.98)
+                elif ("POS" in t_label or t_label == "POSITIVE") and title_out['score'] > 0.70:
                     pred_sentiment = "POSITIVE"
                     senti_score = title_out['score']
                 else:
@@ -205,7 +200,7 @@ if run_analysis:
                         pred_sentiment = "NEUTRAL"
                     senti_score = full_out['score']
             else:
-                senti_out = sentiment_engine(clean_analysis_text)[0]
+                senti_out = sentiment_engine(raw_analysis_text)[0]
                 raw_label = senti_out['label'].upper().strip()
                 
                 if any(w in user_input.lower() for w in STRONG_BULLISH_HEADLINE_KEYWORDS):
@@ -217,9 +212,8 @@ if run_analysis:
                 senti_score = senti_out['score']
             
             # Pipeline 2 Inference: Zero-shot Top-3 Topic Routing Array
-            topic_out = topic_engine(clean_analysis_text, candidate_labels=TOPIC_LABELS, truncation=True, max_length=512)
+            topic_out = topic_engine(raw_analysis_text, candidate_labels=TOPIC_LABELS, truncation=True, max_length=512)
             
-            # Map predictions into a sorted structured array
             top_topics_ranked = []
             for i in range(min(3, len(topic_out['labels']))):
                 clean_name = topic_out['labels'][i].split(" or ")[0].title()
@@ -251,11 +245,10 @@ if run_analysis:
             # STEP 7: ADVANCED OUTPUT VISUALIZATION
             # =====================================================================
             st.markdown("### 🎯 Real-Time Trading Intelligence Output")
-            col1, col2, col3 = st.columns([1.2, 1, 1.2]) # Re-proportioned space to give topics room to display cleanly
+            col1, col2, col3 = st.columns([1.2, 1, 1.2])
             
             with col1:
                 st.markdown("**Ranked Context Distribution (Top 3):**")
-                # Render ranked topics linearly with structural confidence layouts
                 for idx, item in enumerate(top_topics_ranked):
                     st.markdown(f"**Rank {idx+1}:** {item['topic']} `({item['confidence']:.2%})`")
             with col2:
