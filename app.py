@@ -225,54 +225,58 @@ if run_analysis:
             with col1:
                 st.markdown("**Ranked Context Distribution:**")
                 
-                # 🟢 Step 1: Extract names safely
+                # Pre-format all context allocation strings safely
                 r1_name = top_topics_ranked[0]['topic']
                 r2_name = top_topics_ranked[1]['topic']
                 r3_name = top_topics_ranked[2]['topic']
                 
-                # 🟢 Step 2: Convert percentages to pure text strings FIRST to bypass Streamlit's parser bug
                 r1_conf_txt = f"{top_topics_ranked[0]['confidence']:.2%}"
                 r2_conf_txt = f"{top_topics_ranked[1]['confidence']:.2%}"
                 r3_conf_txt = f"{top_topics_ranked[2]['confidence']:.2%}"
                 
-                # 🟢 Step 3: Render using clean, primitive string lookups
                 st.markdown(f"""
                     <div style='font-size:20px; font-weight:bold; margin-bottom:5px;'>
-                        Rank 1: {r1_name} <span style='font-size:16px; font-weight:normal; color:#888;'>({r1_conf_txt})</span>
+                        🥇 Rank 1: {r1_name} <span style='font-size:16px; font-weight:normal; color:#888;'>({r1_conf_txt})</span>
                     </div>
                 """, unsafe_html=True)
                 
                 st.markdown(f"""
                     <div style='font-size:16px; font-weight:bold; margin-bottom:5px; color:#ddd;'>
-                        Rank 2: {r2_name} <span style='font-size:13px; font-weight:normal; color:#888;'>({r2_conf_txt})</span>
+                        🥈 Rank 2: {r2_name} <span style='font-size:13px; font-weight:normal; color:#888;'>({r2_conf_txt})</span>
                     </div>
                 """, unsafe_html=True)
                 
                 st.markdown(f"""
                     <div style='font-size:13px; font-weight:normal; color:#aaa;'>
-                        Rank 3: {r3_name} <span>({r3_conf_txt})</span>
+                        🥉 Rank 3: {r3_name} <span>({r3_conf_txt})</span>
                     </div>
                 """, unsafe_html=True)
             
             with col2:
                 st.markdown("**Fine-Tuned Market Sentiment Matrix:**")
-                # Institutional Display Component for Dominant Bias Matrix
+                
+                # Pre-format all sentiment allocation strings safely to bypass compiler check
+                max_score_txt = f"{max_score:.2%}"
+                pos_score_txt = f"Positive Variance Allocation: {pos_score:.2%}"
+                neu_score_txt = f"Neutral Variance Allocation: {neu_score:.2%}"
+                neg_score_txt = f"Negative Variance Allocation: {neg_score:.2%}"
+                
                 st.markdown(f"""
                     <div style="background-color:rgba(255,255,255,0.05); padding:10px 15px; border-left: 5px solid {hex_color}; border-radius:4px; margin-bottom:15px;">
                         <span style="font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color:#888; display:block;">Dominant Market Bias</span>
                         <span style="font-size: 42px; font-weight: 900; color: {hex_color}; line-height:1.1;">{pred_sentiment}</span>
-                        <span style="font-size: 18px; font-weight: bold; margin-left: 10px; color:#aaa;">({max_score:.2%})</span>
+                        <span style="font-size: 18px; font-weight: bold; margin-left: 10px; color:#aaa;">({max_score_txt})</span>
                     </div>
                 """, unsafe_html=True)
                 
-                # Distribution progress components
-                st.caption(f"Positive Variance Allocation: {pos_score:.2%}")
+                # Streamlit standard visualization components
+                st.caption(pos_score_txt)
                 st.progress(float(pos_score))
                 
-                st.caption(f"Neutral Variance Allocation: {neu_score:.2%}")
+                st.caption(neu_score_txt)
                 st.progress(float(neu_score))
                 
-                st.caption(f"Negative Variance Allocation: {neg_score:.2%}")
+                st.caption(neg_score_txt)
                 st.progress(float(neg_score))
                 
             with col3:
