@@ -33,9 +33,6 @@ TOPIC_LABELS = [
 BULLISH_TRIGGERS = ["surged", "beat", "growth", "jumped", "positive", "highest", "record", "demand", "upgrade", "gained", "climb", "bullish", "rose", "soared", "soar", "strong", "rally"]
 BEARISH_TRIGGERS = ["dropped", "missed", "fell", "slumped", "decline", "negative", "loss", "risk", "downgrade", "warned", "plunged", "deficit", "bearish", "constraint", "slowdown", "down", "weak", "disruption", "hamstrung", "shortage", "pressure", "bottleneck", "blockade"]
 
-STRONG_BULLISH_KEYWORDS = ["high earnings", "all-time high profit", "above expectations", "surged higher", "strong demand", "revenue growth", "upswing", "frenzy", "rally"]
-STRONG_BEARISH_KEYWORDS = ["plunged", "plunge", "dropped", "slumped", "crashed", "missed", "downgraded", "bearish", "fall", "decline", "weak", "hamstrung", "disruption"]
-
 GARBAGE_PATTERNS = [
     "something went wrong", "cookie policy", "browser settings", "broker-dealer", 
     "investment adviser", "does not offer securities", "button links to", 
@@ -69,11 +66,8 @@ with st.spinner("Synchronizing Institutional Model Matrices from HF Hub..."):
 def advanced_text_cleaner(text):
     if not text:
         return ""
-    # Strip out live stock ticker percentages (+5.43%) to prevent feature pollution
     text = re.sub(r'[-+]\d+(?:\.\d+)?\s*\(\s*[-+]\d+(?:\.\d+)?%\s*\)', '', text)
-    # Clear index metadata scrapers
     text = re.sub(r'RT Quote\s*\|\s*Exchange\s*\|\s*USD', '', text, flags=re.IGNORECASE)
-    # Wipe out raw ticker data tables
     text = re.sub(r'\b\d{1,3}(?:,\d{3})+\.(?:\d+)\b', '', text)
     return text
 
@@ -108,14 +102,9 @@ def extract_fallback_title(url):
     return " ".join([w for w in words if not w.isdigit() and len(w) > 2]).title()
 
 def extract_granular_evidence(text, primary_bias):
-    """
-    Extracts structural market triggers and tail-risk signals based on primary sentiment.
-    Implements macro black-swan detection and balanced neutral mapping.
-    """
     sentences = re.split(r'(?<=[.!?])\s+', text)[:40] 
     primary_evidence, opposing_evidence = [], []
     
-    # Institutional Macro and Micro Tail-Risk Glossaries
     macro_risk_words = ["war", "conflict", "clashed", "strikes", "supply shock", "shuttered", "disruption", "shortage", "blockade", "sanctions", "stalemate"]
     macro_turnaround_words = ["truce", "peace efforts", "ceasefire", "reopening", "negotiations", "agreement"]
 
@@ -126,7 +115,6 @@ def extract_granular_evidence(text, primary_bias):
         
         s_lower = s_clean.lower()
         
-        # --- PATH A: BULLISH PRIMARY SENTIMENT ---
         if primary_bias == "BULLISH":
             if any(t in s_lower for t in BULLISH_TRIGGERS) and len(primary_evidence) < 2:
                 if s_clean not in primary_evidence:
@@ -135,7 +123,6 @@ def extract_granular_evidence(text, primary_bias):
                 if s_clean not in primary_evidence:
                     opposing_evidence.append(s_clean)
 
-        # --- PATH B: BEARISH PRIMARY SENTIMENT ---
         elif primary_bias == "BEARISH":
             if any(t in s_lower for t in BEARISH_TRIGGERS) and len(primary_evidence) < 2:
                 if s_clean not in primary_evidence:
@@ -144,7 +131,6 @@ def extract_granular_evidence(text, primary_bias):
                 if s_clean not in primary_evidence:
                     opposing_evidence.append(s_clean)
 
-        # --- PATH C: NEUTRAL / COMPRESSED VOLATILITY SENTIMENT ---
         else:
             has_bull_token = any(t in s_lower for t in BULLISH_TRIGGERS)
             has_bear_token = any(t in s_lower for t in BEARISH_TRIGGERS)
@@ -162,7 +148,6 @@ def extract_granular_evidence(text, primary_bias):
                 if s_clean not in primary_evidence:
                     opposing_evidence.append(s_clean)
 
-    # Robust Fallback Vector Processing
     if not primary_evidence and sentences:
         for s in sentences:
             if len(s.strip()) > 35 and not any(g in s.lower() for g in GARBAGE_PATTERNS):
@@ -183,13 +168,13 @@ st.subheader("Financial Intelligence Input Gateway")
 st.info("💡 **Operational Guidance:** Copy and paste raw macroeconomic or equity transcripts below. The architecture utilizes localized telemetry filtering to decouple market noise and ticker artifacts prior to neural inference.")
 
 placeholder_msg = "Paste regulatory wires, corporate text copies, or market tweets here..."
-default_context = "NVIDIA Reinforces Bullish Outlook as AI Accelerators Demand Surges. Data center revenue remained the key growth engine, powered by demand for Nvidia's GPUs and AI accelerators. Companies developing large language models (LLMs), generative AI applications, and advanced computing systems continue to rely heavily on Nvidia hardware."
+default_context = "NVIDIA Reinforces Bullish Outlook as AI Accelerators Demand Surges. Data center revenue remained the key growth engine, powered by demand for Nvidia's GPUs and AI accelerators."
 
 user_input = st.text_area("Input Terminal Gateway (Text / Live URL):", value=default_context, placeholder=placeholder_msg, height=120)
 run_analysis = st.button("Execute Quantitative Analysis Chain", type="primary")
 
 # =====================================================================
-# STEP 6: RISK-MITIGATED INFERENCE OVERLAYS (RESOLVED MATRIX LOGIC)
+# STEP 6: RISK-MITIGATED INFERENCE OVERLAYS
 # =====================================================================
 if run_analysis:
     if not user_input.strip():
@@ -216,12 +201,13 @@ if run_analysis:
                 sanitized_lines = [l.strip() for l in lines if l.strip() and not any(g in l.lower() for g in GARBAGE_PATTERNS)]
                 raw_analysis_text = " ".join(sanitized_lines)
 
-            # Scrub incoming dataset - FIXED HERE
+            # Clean dataset text from ticker noise
             raw_analysis_text = advanced_text_cleaner(raw_analysis_text)
 
             title_lower = news_title.lower().strip()
             text_lower = raw_analysis_text.lower()
             
+            # 1. Run FinBERT Sentiment Engine
             sentiment_outputs = sentiment_engine(raw_analysis_text, truncation=True, max_length=512)[0]
             scores_map = {item['label'].upper().strip(): item['score'] for item in sentiment_outputs}
             
@@ -229,45 +215,37 @@ if run_analysis:
             neg_score = scores_map.get("NEGATIVE", scores_map.get("LABEL_0", 0.0))
             neu_score = scores_map.get("NEUTRAL", scores_map.get("LABEL_1", 0.0))
             
-            # Extract ranked topics first to inform contextual rule filtering
+            # 2. Run Topic Classification Pipeline
             topic_out = topic_engine(raw_analysis_text, candidate_labels=TOPIC_LABELS, truncation=True, max_length=512)
             top_topics_ranked = []
             for i in range(min(3, len(topic_out['labels']))):
                 clean_name = topic_out['labels'][i].split(" or ")[0].title()
                 top_topics_ranked.append({"topic": clean_name, "confidence": topic_out['scores'][i]})
 
-            # --- 🛠️ RECONFIGURED: Context-Aware Dynamic Risk Matrix ---
+            # 3. --- 🛠️ RESOLVED RECONFIGURED DECISION MATRIX ---
             has_supply_disruption = any(w in text_lower for w in ["supply chain", "disruption", "bottleneck", "hamstrung", "shortage", "blockade"])
             has_macro_cost_pressures = any(w in text_lower for w in ["rising costs", "inflation", "freight costs", "pressure on"])
             has_conflict_context = any(w in text_lower for w in ["war", "conflict", "stalemate", "tensions", "standoff", "strikes"])
 
             is_earnings = len(top_topics_ranked) > 0 and top_topics_ranked[0]['topic'] == "Earnings Report"
-            model_is_strongly_bullish = pos_score > 0.65
 
-            # Dynamic Thresholding: Macro disruptions ONLY override if the neural engine isn't overwhelmingly certain of a fundamental micro-shining event
+            # Check macro danger zones dynamically without crushing neural decisions
             if (has_conflict_context and has_supply_disruption) or (has_supply_disruption and has_macro_cost_pressures):
-                if is_earnings and model_is_strongly_bullish:
-                    # Contextual Exception: blowout earnings beat defers macro risks; allow alpha expression but account for premium volatility
-                    pos_score = max(pos_score, 0.75)
-                    neg_score = min(neg_score, 0.15)
-                    neu_score = 1.0 - (neg_score + pos_score)
+                if is_earnings:
+                    # Let the FinBERT model decide the fundamental direction, just reserve 15% for tail risk volatility
+                    neg_score = max(neg_score, 0.15)
+                    neu_score = 1.0 - (neg_score + pos_score) if (neg_score + pos_score) <= 1.0 else 0.0
                 else:
-                    # Regular Overrule: general news lacking strong micro performance defaults to strict safety protocol
-                    neg_score = max(neg_score, 0.88)
-                    pos_score = min(pos_score, 0.06)
-                    neu_score = 1.0 - (neg_score + pos_score)
-            else:
-                # Regular Keyword Filters (Fallback Boosters)
-                if any(w in text_lower for w in STRONG_BULLISH_KEYWORDS):
-                    pos_score, neg_score = max(pos_score, 0.85), min(neg_score, 0.10)
-                elif any(w in text_lower for w in STRONG_BEARISH_KEYWORDS):
-                    neg_score, pos_score = max(neg_score, 0.85), min(pos_score, 0.10)
+                    # General generic news with macro alerts defaults to safe defensive bias
+                    neg_score = max(neg_score, 0.60)
+                    neu_score = 1.0 - (neg_score + pos_score) if (neg_score + pos_score) <= 1.0 else 0.0
             
-            # Probability Normalization
+            # Probability Normalization Block
             total_sum = pos_score + neg_score + neu_score
-            pos_score /= total_sum
-            neg_score /= total_sum
-            neu_score /= total_sum
+            if total_sum > 0:
+                pos_score /= total_sum
+                neg_score /= total_sum
+                neu_score /= total_sum
 
             max_score = max(pos_score, neg_score, neu_score)
             if max_score == pos_score:
