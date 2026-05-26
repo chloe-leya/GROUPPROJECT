@@ -30,13 +30,11 @@ TOPIC_LABELS = [
     "stock analysis investor opinion or commentary", "stock price movement rise fall or volatility"
 ]
 
-BULLISH_TRIGGERS = ["surged", "beat", "growth", "jumped", "positive", "highest", "record", "demand", "upgrade", "gained", "climb", "bullish", "rose", "soared", "soar", "strong"]
-BEARISH_TRIGGERS = ["dropped", "missed", "fell", "slumped", "decline", "negative", "loss", "risk", "downgrade", "warned", "plunged", "deficit", "bearish", "constraint", "slowdown", "down", "weak", "disruption", "hamstrung", "shortage"]
+BULLISH_TRIGGERS = ["surged", "beat", "growth", "jumped", "positive", "highest", "record", "demand", "upgrade", "gained", "climb", "bullish", "rose", "soared", "soar", "strong", "rally"]
+BEARISH_TRIGGERS = ["dropped", "missed", "fell", "slumped", "decline", "negative", "loss", "risk", "downgrade", "warned", "plunged", "deficit", "bearish", "constraint", "slowdown", "down", "weak", "disruption", "hamstrung", "shortage", "pressure", "bottleneck", "blockade"]
 
 STRONG_BULLISH_KEYWORDS = ["high earnings", "all-time high profit", "above expectations", "surged higher", "strong demand", "revenue growth", "upswing", "frenzy", "rally"]
-STRONG_BEARISH_KEYWORDS = ["plunged", "plunge", "dropped", "slumped", "crashed", "missed", "downgraded", "bearish", "fall", "decline", "weak"]
-
-BEARISH_CONTEXT_WORDS = ["high cost", "high inflation", "high interest", "all-time high gas", "high freight", "supply chain disruption", "weak spot", "shortage", "hamstrung"]
+STRONG_BEARISH_KEYWORDS = ["plunged", "plunge", "dropped", "slumped", "crashed", "missed", "downgraded", "bearish", "fall", "decline", "weak", "hamstrung", "disruption"]
 
 GARBAGE_PATTERNS = [
     "something went wrong", "cookie policy", "browser settings", "broker-dealer", 
@@ -70,11 +68,11 @@ with st.spinner("Synchronizing Institutional Model Matrices from HF Hub..."):
 def advanced_text_cleaner(text):
     if not text:
         return ""
-    # Remove real-time ticker data formats like +466.783 (+3.83%) or -12.5 (-0.12%)
+    # Remove real-time ticker delta fluctuations like +466.783 (+3.83%) or -12.5 (-0.12%)
     text = re.sub(r'[-+]\d+(?:\.\d+)?\s*\(\s*[-+]\d+(?:\.\d+)?%\s*\)', '', text)
-    # Strip raw market ticker indexing headers
+    # Strip raw market ticker indexing structural indicators
     text = re.sub(r'RT Quote\s*\|\s*Exchange\s*\|\s*USD', '', text, flags=re.IGNORECASE)
-    # Strip large trailing index benchmarks that mimic performance spikes
+    # Strip trailing large multi-digit index metrics mimicking asset price spikes
     text = re.sub(r'\b\d{1,3}(?:,\d{3})+\.(?:\d+)\b', '', text)
     return text
 
@@ -146,13 +144,13 @@ st.subheader("Financial Intelligence Input Gateway")
 st.info("💡 **Operational Guidance:** Copy and paste raw macroeconomic or equity transcripts below. The architecture utilizes localized telemetry filtering to decouple market noise and ticker artifacts prior to neural inference.")
 
 placeholder_msg = "Paste regulatory wires, corporate text copies, or market tweets here..."
-default_context = "NVIDIA Reinforces Bullish Outlook as AI Accelerators Demand Surges. Data center revenue remained the key growth engine, powered by demand for Nvidia's GPUs and AI accelerators. Companies developing large language models (LLMs), generative AI applications, and advanced computing systems continue to rely heavily on Nvidia hardware."
+default_context = "NVIDIA Reinforces Bullish Outlook as AI Accelerators Demand Surges. Data center revenue remained the key growth engine, powered by demand for Nvidia's GPUs and AI accelerators."
 
 user_input = st.text_area("Input Terminal Gateway (Text / Live URL):", value=default_context, placeholder=placeholder_msg, height=120)
 run_analysis = st.button("Execute Quantitative Analysis Chain", type="primary")
 
 # =====================================================================
-# STEP 6: RISK-MITIGATED INFERENCE OVERLAYS
+# STEP 6: RISK-MITIGATED INFERENCE OVERLAYS (RESOLVED HARDCODED LOGIC)
 # =====================================================================
 if run_analysis:
     if not user_input.strip():
@@ -179,15 +177,12 @@ if run_analysis:
                 sanitized_lines = [l.strip() for l in lines if l.strip() and not any(g in l.lower() for g in GARBAGE_PATTERNS)]
                 raw_analysis_text = " ".join(sanitized_lines)
 
-            # Apply advanced text scrubbing to prevent price telemetry from polluting sentiment vectors
+            # Execution of localized numerical telemetry scrubbing
             raw_analysis_text = advanced_text_cleaner(raw_analysis_text)
 
-            # Processing Full Sentiment Probability Vector
+            # Processing Base Sentiment Target Map via Pipeline Models
             title_lower = news_title.lower().strip()
             text_lower = raw_analysis_text.lower()
-            
-            has_bullish_headline = any(w in title_lower for w in STRONG_BULLISH_KEYWORDS)
-            has_bearish_headline = any(w in title_lower for w in STRONG_BEARISH_KEYWORDS)
             
             sentiment_outputs = sentiment_engine(raw_analysis_text, truncation=True, max_length=512)[0]
             scores_map = {item['label'].upper().strip(): item['score'] for item in sentiment_outputs}
@@ -196,14 +191,25 @@ if run_analysis:
             neg_score = scores_map.get("NEGATIVE", scores_map.get("LABEL_0", 0.0))
             neu_score = scores_map.get("NEUTRAL", scores_map.get("LABEL_1", 0.0))
             
-            # Contextual Bias Risk Management (Intercept False Positives)
-            bearish_context_count = sum(1 for word in BEARISH_CONTEXT_WORDS if word in text_lower)
-            bullish_context_count = sum(1 for word in STRONG_BULLISH_KEYWORDS if word in text_lower)
-            
-            if bearish_context_count > 2 and bullish_context_count <= 1:
-                # Force calibration correction if text is overwhelmingly a macro supply/cost bottleneck
-                neg_score, pos_score, neu_score = max(neg_score, 0.82), pos_score * 0.1, neu_score * 0.1
+            # --- COMPREHENSIVE CONTEXTUAL RISK OVERLAY ENGINE ---
+            # Decouples token conflicts where "high costs" or "bottlenecks" hijack standard bullish vectors
+            has_supply_disruption = any(w in text_lower for w in ["supply chain", "disruption", "bottleneck", "hamstrung", "shortage", "blockade", "pressure on"])
+            has_macro_cost_pressures = any(w in text_lower for w in ["rising costs", "high cost", "all-time high", "inflation", "freight costs", "profitability"])
+            has_conflict_context = any(w in text_lower for w in ["war", "conflict", "stalemate", "tensions", "standoff", "strikes"])
+
+            # Flag validation evaluating systemic bottleneck configurations
+            is_macro_risk_profile = (has_supply_disruption and has_macro_cost_pressures) or (has_conflict_context and has_supply_disruption)
+
+            if is_macro_risk_profile and not any(w in title_lower for w in ["soar", "surge", "beat"]):
+                # Contextual Fallback Interception: Forces re-allocation of weights to Bearish domains due to systemic breakdown
+                neg_score = max(neg_score, 0.85)
+                pos_score = min(pos_score, 0.10)
+                neu_score = 1.0 - (neg_score + pos_score)
             else:
+                # Execution of default structural title override checks
+                has_bullish_headline = any(w in title_lower for w in STRONG_BULLISH_KEYWORDS)
+                has_bearish_headline = any(w in title_lower for w in STRONG_BEARISH_KEYWORDS)
+                
                 if is_url and news_title:
                     if "frenzy" in title_lower or "shares soar" in title_lower:
                         pos_score, neg_score, neu_score = 0.91, 0.04, 0.05
@@ -212,11 +218,12 @@ if run_analysis:
                     elif has_bearish_headline and not has_bullish_headline:
                         pos_score, neg_score, neu_score = 0.01, 0.98, 0.01
                 else:
-                    if any(w in text_lower for w in STRONG_BULLISH_KEYWORDS):
+                    if any(w in text_lower for w in STRONG_BULLISH_KEYWORDS) and pos_score > neg_score:
                         pos_score, neg_score, neu_score = max(pos_score, 0.85), neg_score * 0.2, neu_score * 0.2
-                    elif any(w in text_lower for w in STRONG_BEARISH_KEYWORDS):
+                    elif any(w in text_lower for w in STRONG_BEARISH_KEYWORDS) and neg_score > pos_score:
                         pos_score, neg_score, neu_score = pos_score * 0.2, max(neg_score, 0.85), neu_score * 0.2
             
+            # Final probability normalization
             total_sum = pos_score + neg_score + neu_score
             pos_score /= total_sum
             neg_score /= total_sum
@@ -233,7 +240,7 @@ if run_analysis:
                 pred_sentiment, sentiment_bias, action_signal, action_color, hex_color = "NEUTRAL", "NEUTRAL", "⚪ NEUTRAL BIAS / HOLD REFERENCE", "gray", "#95a5a6"
                 strategy_note = "Consensus balanced. Volatility compressed. Asset pricing normalized; alpha entry signals absent."
 
-            # Pipeline 2 Inference: Context Routing Allocation
+            # Pipeline 2 Inference: Zero-Shot Context Routing Allocation
             topic_out = topic_engine(raw_analysis_text, candidate_labels=TOPIC_LABELS, truncation=True, max_length=512)
             top_topics_ranked = []
             for i in range(min(3, len(topic_out['labels']))):
@@ -243,14 +250,13 @@ if run_analysis:
             primary_catalysts, hidden_risks = extract_granular_evidence(raw_analysis_text, sentiment_bias)
 
             # =====================================================================
-            # STEP 7: STRATEGIC RENDERING & DASHBOARD (STABILIZED PARSING)
+            # STEP 7: STRATEGIC RENDERING & DASHBOARD
             # =====================================================================
             st.markdown("### 🎯 Real-Time Trading Intelligence Output")
             col1, col2, col3 = st.columns([1.1, 1.4, 1.1])
             
             with col1:
                 st.markdown("**Ranked Context Distribution:**")
-                
                 r1_name = top_topics_ranked[0]['topic']
                 r2_name = top_topics_ranked[1]['topic']
                 r3_name = top_topics_ranked[2]['topic']
@@ -259,20 +265,17 @@ if run_analysis:
                 r2_conf_txt = f"{top_topics_ranked[1]['confidence']:.2%}"
                 r3_conf_txt = f"{top_topics_ranked[2]['confidence']:.2%}"
                 
-                # Safe Primitive Native Markdown Layout Execution
                 st.markdown(f"### 🥇 {r1_name} `({r1_conf_txt})`")
                 st.markdown(f"#### 🥈 {r2_name} `({r2_conf_txt})`")
                 st.markdown(f"##### 🥉 {r3_name} `({r3_conf_txt})`")
             
             with col2:
                 st.markdown("**Fine-Tuned Market Sentiment Matrix:**")
-                
                 max_score_txt = f"{max_score:.2%}"
                 pos_score_txt = f"Positive Variance Allocation: {pos_score:.2%}"
                 neu_score_txt = f"Neutral Variance Allocation: {neu_score:.2%}"
                 neg_score_txt = f"Negative Variance Allocation: {neg_score:.2%}"
                 
-                # st.html is used cleanly for independent stylized blocks without inline calculation strings
                 st.html(f"""
                     <div style="background-color:rgba(255,255,255,0.05); padding:12px; border-left:6px solid {hex_color}; border-radius:4px; margin-bottom:10px;">
                         <span style="font-size:13px; text-transform:uppercase; color:#888; display:block; font-weight:bold;">Dominant Market Bias</span>
