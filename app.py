@@ -30,8 +30,9 @@ TOPIC_LABELS = [
     "stock analysis investor opinion or commentary", "stock price movement rise fall or volatility"
 ]
 
-BULLISH_TRIGGERS = ["surged", "beat", "growth", "jumped", "positive", "highest", "record", "demand", "upgrade", "gained", "climb", "bullish", "rose"]
-BEARISH_TRIGGERS = ["dropped", "missed", "fell", "slumped", "decline", "negative", "loss", "risk", "downgrade", "warned", "plunged", "deficit", "bearish", "constraint", "slowdown"]
+# Expanded highly-sensitive lexical triggers for institutional financial analytics
+BULLISH_TRIGGERS = ["surged", "beat", "growth", "jumped", "positive", "highest", "record", "demand", "upgrade", "gained", "climb", "bullish", "rose", "soared", "soar", "high", "above"]
+BEARISH_TRIGGERS = ["dropped", "missed", "fell", "slumped", "decline", "negative", "loss", "risk", "downgrade", "warned", "plunged", "deficit", "bearish", "constraint", "slowdown", "down"]
 
 # ==========================================
 # STEP 3: CACHED MODEL INITIALIZATION MATRIX
@@ -81,6 +82,7 @@ def extract_text_from_url(url):
         return None, None
 
 def extract_granular_evidence(text, primary_bias):
+    # Splits text preserving absolute digit strings for full data transparency
     sentences = re.split(r'(?<=[.!?])\s+', text)
     primary_evidence = []
     opposing_evidence = []
@@ -94,7 +96,8 @@ def extract_granular_evidence(text, primary_bias):
 
     for sentence in sentences:
         sentence_str = sentence.strip()
-        if len(sentence_str) < 20:
+        # Drop raw webpage noise or copyright footers scraped from URL buffers
+        if len(sentence_str) < 30 or "yahoo finance" in sentence_str.lower()[:20]:
             continue
             
         if any(t in sentence_str.lower() for t in primary_tokens) and len(primary_evidence) < 2:
@@ -105,8 +108,15 @@ def extract_granular_evidence(text, primary_bias):
             if sentence_str not in primary_evidence and sentence_str not in opposing_evidence:
                 opposing_evidence.append(sentence_str)
                 
-    if not primary_evidence and sentences:
-        primary_evidence.append(sentences[0])
+    # Fallback protocol: If no specific trigger token matches, pull valid long wire frames
+    if not primary_evidence:
+        for s in sentences:
+            if len(s.strip()) > 40 and "yahoo finance" not in s.lower():
+                primary_evidence.append(s.strip())
+                if len(primary_evidence) >= 1:
+                    break
+        if not primary_evidence and sentences:
+            primary_evidence.append(sentences[0])
         
     return primary_evidence, opposing_evidence
 
@@ -119,10 +129,9 @@ st.markdown("---")
 st.subheader("Financial News & Intelligence Input Portal")
 st.markdown("*System auto-detects input format. Supports raw news copy, market tweets, or live news URLs (e.g., Yahoo Finance).*")
 
-default_text = "https://finance.yahoo.com/news/stocks-and-earnings-surge-and-iran-deal-may-be-imminent-what-to-watch-this-week-114338066.html"
+default_text = "https://finance.yahoo.com/markets/stocks/articles/dell-stock-soared-over-130-091719505.html"
 user_input = st.text_area("Input Terminal Gateway (Text/URL):", value=default_text, height=90)
 
-# 确保触发按钮安全地渲染在输入框下方
 run_analysis = st.button("Generate Trading Intelligence Reference", type="primary")
 
 # =====================================================================
@@ -152,40 +161,48 @@ if run_analysis:
             # =========================================================
             # 🔥 DATA CLEANING & TITLE BOOSTING MATRIX
             # =========================================================
-            # 1. 用正则表达式将文本和标题中所有的具体数字替换为 [NUM]，消除非正常的数值漂移和噪音
-            analysis_text = re.sub(r'\d+(,\d+)*', '[NUM]', raw_analysis_text)
+            # Inference Block: Mask numerical anomalies with [NUM] token to prevent extreme price shifts (e.g., 130%) from distorting the base model weights
+            clean_analysis_text = re.sub(r'\d+(,\d+)*', '[NUM]', raw_analysis_text)
             clean_title = re.sub(r'\d+(,\d+)*', '[NUM]', news_title) if news_title else ""
             
-            # 2. 多模型决策加权层
             if is_url and clean_title:
-                # 分别对清洗后的“纯标题”和“全文本”运行情感分析
                 title_out = sentiment_engine(clean_title)[0]
-                full_out = sentiment_engine(analysis_text)[0]
+                full_out = sentiment_engine(clean_analysis_text)[0]
                 
-                # 黄金法则：如果标题展现出大于 85% 的极强情感方向，强制采用标题结论，防止长文本噪音稀释
-                if title_out['label'] != full_out['label'] and title_out['score'] > 0.85:
-                    pred_sentiment = title_out['label'].upper()
+                # Standardize raw prediction string formats
+                t_label = title_out['label'].upper().strip()
+                f_label = full_out['label'].upper().strip()
+                
+                # Title Boosting Filter: Override if title yields strong structural trends (e.g. "Soared over 130%") with a confidence score above 80%
+                if ("POS" in t_label or t_label == "POSITIVE") and title_out['score'] > 0.80:
+                    pred_sentiment = "POSITIVE"
                     senti_score = title_out['score']
                 else:
-                    pred_sentiment = full_out['label'].upper()
+                    if "POS" in f_label or f_label == "POSITIVE":
+                        pred_sentiment = "POSITIVE"
+                    elif "NEG" in f_label or f_label == "NEGATIVE":
+                        pred_sentiment = "NEGATIVE"
+                    else:
+                        pred_sentiment = "NEUTRAL"
                     senti_score = full_out['score']
             else:
-                senti_out = sentiment_engine(analysis_text)[0]
-                pred_sentiment = senti_out['label'].upper()
+                senti_out = sentiment_engine(clean_analysis_text)[0]
+                raw_label = senti_out['label'].upper().strip()
+                pred_sentiment = "POSITIVE" if "POS" in raw_label else ("NEGATIVE" if "NEG" in raw_label else "NEUTRAL")
                 senti_score = senti_out['score']
             
             # Pipeline 2 Inference: Zero-shot Topic Space Router
-            topic_out = topic_engine(analysis_text, candidate_labels=TOPIC_LABELS, truncation=True, max_length=512)
+            topic_out = topic_engine(clean_analysis_text, candidate_labels=TOPIC_LABELS, truncation=True, max_length=512)
             top_topic = topic_out['labels'][0]
             topic_score = topic_out['scores'][0]
             
             # Execute Business Decision Translation Logic
-            if "POS" in pred_sentiment or "BULLISH" in pred_sentiment:
+            if pred_sentiment == "POSITIVE":
                 sentiment_bias = "BULLISH"
                 action_signal = "🟢 BULLISH BIAS / LONG REFERENCE"
                 action_color = "green"
                 strategy_note = "High probability upward momentum. Favorable window for programmatic asset accumulation or call placement."
-            elif "NEG" in pred_sentiment or "BEARISH" in pred_sentiment:
+            elif pred_sentiment == "NEGATIVE":
                 sentiment_bias = "BEARISH"
                 action_signal = "🔴 BEARISH BIAS / SHORT REFERENCE"
                 action_color = "red"
@@ -196,8 +213,8 @@ if run_analysis:
                 action_color = "gray"
                 strategy_note = "Consensus balanced. Volatility compressed. Asset pricing normalized; alpha entry signals absent."
 
-            # Dynamic Feature Extraction: Isolate catalysts and conflicting risks from raw context
-            primary_catalysts, hidden_risks = extract_granular_evidence(analysis_text, sentiment_bias)
+            # Auditing Layer: Extract context from raw_analysis_text to ensure quantitative visibility (e.g., 130% stays visible)
+            primary_catalysts, hidden_risks = extract_granular_evidence(raw_analysis_text, sentiment_bias)
 
             # =====================================================================
             # STEP 7: ADVANCED OUTPUT VISUALIZATION
@@ -223,17 +240,14 @@ if run_analysis:
                 st.subheader("🔍 Core Supporting Market Triggers")
                 st.markdown("Specific statements driving the primary AI market sentiment output:")
                 for catalyst in primary_catalysts:
-                    # 将高亮的 [NUM] 还原为符合可读性的叙述
-                    readable_catalyst = catalyst.replace('[NUM]', '[数值]')
-                    st.markdown(f"> ✅ *\"... {readable_catalyst} ...\"*")
+                    st.markdown(f"> ✅ *\"... {catalyst} ...\"*")
             
             with col_right:
                 st.subheader("⚠️ Dual-Force Risk Audit")
                 if hidden_risks:
                     st.markdown("Warning: The system isolated the following **opposing risk factors** within the wire context:")
                     for risk in hidden_risks:
-                        readable_risk = risk.replace('[NUM]', '[数值]')
-                        st.markdown(f"> ❌ *\"... {readable_risk} ...\"*")
+                        st.markdown(f"> ❌ *\"... {risk} ...\"*")
                 else:
                     st.success("No meaningful counter-sentiment lexical anomalies or opposing structural risk statements detected.")
             
