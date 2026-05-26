@@ -50,7 +50,6 @@ GARBAGE_PATTERNS = [
 @st.cache_resource
 def initialize_pipelines():
     device = 0 if torch.cuda.is_available() else -1
-    # Note: top_k=None forces the pipeline to return probabilities for ALL labels
     sentiment_pipe = pipeline(
         "text-classification", 
         model="chloeleya/finbert-fine-tuned-sentiment-model", 
@@ -172,18 +171,13 @@ if run_analysis:
             has_bullish_headline = any(w in title_lower for w in STRONG_BULLISH_KEYWORDS)
             has_bearish_headline = any(w in title_lower for w in STRONG_BEARISH_KEYWORDS)
             
-            # Returns sorted list of all classes based on configurations in Step 3
             sentiment_outputs = sentiment_engine(raw_analysis_text, truncation=True, max_length=512)[0]
-            
-            # Map out scores into a standard clean dict map
             scores_map = {item['label'].upper().strip(): item['score'] for item in sentiment_outputs}
             
-            # Resolve legacy variant names from custom fine-tuned model topologies
             pos_score = scores_map.get("POSITIVE", scores_map.get("LABEL_2", 0.0))
             neg_score = scores_map.get("NEGATIVE", scores_map.get("LABEL_0", 0.0))
             neu_score = scores_map.get("NEUTRAL", scores_map.get("LABEL_1", 0.0))
             
-            # Dynamic heuristic corrections based on title override matrices
             if is_url and news_title:
                 if "frenzy" in title_lower or "shares soar" in title_lower:
                     pos_score, neg_score, neu_score = 0.91, 0.04, 0.05
@@ -197,22 +191,20 @@ if run_analysis:
                 elif any(w in raw_analysis_text.lower() for w in STRONG_BEARISH_KEYWORDS):
                     pos_score, neg_score, neu_score = pos_score * 0.2, max(neg_score, 0.85), neu_score * 0.2
             
-            # Normalize tracking vectors back to a uniform 100% total allocation
             total_sum = pos_score + neg_score + neu_score
             pos_score /= total_sum
             neg_score /= total_sum
             neu_score /= total_sum
 
-            # Determine dominant label for operational switching
             max_score = max(pos_score, neg_score, neu_score)
             if max_score == pos_score:
-                pred_sentiment, sentiment_bias, action_signal, action_color = "POSITIVE", "BULLISH", "🟢 BULLISH BIAS / LONG REFERENCE", "green"
+                pred_sentiment, sentiment_bias, action_signal, action_color, hex_color = "POSITIVE", "BULLISH", "🟢 BULLISH BIAS / LONG REFERENCE", "green", "#2ecc71"
                 strategy_note = "High probability upward momentum. Favorable window for programmatic asset accumulation or call placement."
             elif max_score == neg_score:
-                pred_sentiment, sentiment_bias, action_signal, action_color = "NEGATIVE", "BEARISH", "🔴 BEARISH BIAS / SHORT REFERENCE", "red"
+                pred_sentiment, sentiment_bias, action_signal, action_color, hex_color = "NEGATIVE", "BEARISH", "🔴 BEARISH BIAS / SHORT REFERENCE", "red", "#e74c3c"
                 strategy_note = "Downside risk asset drift active. Tactical hedging overlays or short equity allocation advised."
             else:
-                pred_sentiment, sentiment_bias, action_signal, action_color = "NEUTRAL", "NEUTRAL", "⚪ NEUTRAL BIAS / HOLD REFERENCE", "gray"
+                pred_sentiment, sentiment_bias, action_signal, action_color, hex_color = "NEUTRAL", "NEUTRAL", "⚪ NEUTRAL BIAS / HOLD REFERENCE", "gray", "#95a5a6"
                 strategy_note = "Consensus balanced. Volatility compressed. Asset pricing normalized; alpha entry signals absent."
 
             # Pipeline 2 Inference: Context Routing Allocation
@@ -225,20 +217,28 @@ if run_analysis:
             primary_catalysts, hidden_risks = extract_granular_evidence(raw_analysis_text, sentiment_bias)
 
             # =====================================================================
-            # STEP 7: STRATEGIC RENDERING & DASHBOARD
+            # STEP 7: STRATEGIC RENDERING & DASHBOARD (OPTIMIZED hierarchy)
             # =====================================================================
             st.markdown("### 🎯 Real-Time Trading Intelligence Output")
-            col1, col2, col3 = st.columns([1.2, 1.3, 1.2])
+            col1, col2, col3 = st.columns([1.1, 1.4, 1.1])
             
             with col1:
-                st.markdown("**Ranked Context Distribution (Top 3):**")
-                for idx, item in enumerate(top_topics_ranked):
-                    st.markdown(f"**Rank {idx+1}:** {item['topic']} `({item['confidence']:.2%})`")
+                st.markdown("**Ranked Context Distribution:**")
+                # Visual Hierarchy Funneling for Topic Ranks
+                st.markdown(f"<div style='font-size:20px; font-weight:bold; margin-bottom:5px;'>🥇 Rank 1: {top_topics_ranked[0]['topic']} <span style='font-size:16px; font-weight:normal; color:#888;'>({top_topics_ranked[0]['confidence']:.2%})</span></div>", unsafe_html=True)
+                st.markdown(f"<div style='font-size:16px; font-weight:bold; margin-bottom:5px; color:#ddd;'>🥈 Rank 2: {top_topics_ranked[1]['topic']} <span style='font-size:13px; font-weight:normal; color:#888;'>({top_topics_ranked[1]['confidence']:.2%})</span></div>", unsafe_html=True)
+                st.markdown(f"<div style='font-size:13px; font-weight:normal; color:#aaa;'>🥉 Rank 3: {top_topics_ranked[2]['topic']} <span>({top_topics_ranked[2]['confidence']:.2%})</span></div>", unsafe_html=True)
             
             with col2:
                 st.markdown("**Fine-Tuned Market Sentiment Matrix:**")
-                # Highlight the primary sentiment cleanly using native standard elements
-                st.markdown(f"Dominant Bias: **{pred_sentiment}** *(Confidence: {max_score:.2%})*")
+                # Huge Institutional Display for Dominant Bias
+                st.markdown(f"""
+                    <div style="background-color:rgba(255,255,255,0.05); padding:10px 15px; border-left: 5px solid {hex_color}; border-radius:4px; margin-bottom:15px;">
+                        <span style="font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color:#888; display:block;">Dominant Market Bias</span>
+                        <span style="font-size: 42px; font-weight: 900; color: {hex_color}; line-height:1.1;">{pred_sentiment}</span>
+                        <span style="font-size: 18px; font-weight: bold; margin-left: 10px; color:#aaa;">({max_score:.2%})</span>
+                    </div>
+                """, unsafe_html=True)
                 
                 # Render clean progress distributions maps
                 st.caption(f"Positive Variance Allocation: {pos_score:.2%}")
