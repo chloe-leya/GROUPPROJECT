@@ -225,32 +225,32 @@ if run_analysis:
             with col1:
                 st.markdown("**Ranked Context Distribution:**")
                 
-                # Decoupling string token parsing from inner rendering dictionaries
+                # 🟢 Step 1: Extract names safely
                 r1_name = top_topics_ranked[0]['topic']
-                r1_conf = top_topics_ranked[0]['confidence']
-                
                 r2_name = top_topics_ranked[1]['topic']
-                r2_conf = top_topics_ranked[1]['confidence']
-                
                 r3_name = top_topics_ranked[2]['topic']
-                r3_conf = top_topics_ranked[2]['confidence']
                 
-                # Strict Visual Hierarchy Funneling using Standard Triple Quotes
+                # 🟢 Step 2: Convert percentages to pure text strings FIRST to bypass Streamlit's parser bug
+                r1_conf_txt = f"{top_topics_ranked[0]['confidence']:.2%}"
+                r2_conf_txt = f"{top_topics_ranked[1]['confidence']:.2%}"
+                r3_conf_txt = f"{top_topics_ranked[2]['confidence']:.2%}"
+                
+                # 🟢 Step 3: Render using clean, primitive string lookups
                 st.markdown(f"""
                     <div style='font-size:20px; font-weight:bold; margin-bottom:5px;'>
-                        Rank 1: {r1_name} <span style='font-size:16px; font-weight:normal; color:#888;'>({r1_conf:.2%})</span>
+                        Rank 1: {r1_name} <span style='font-size:16px; font-weight:normal; color:#888;'>({r1_conf_txt})</span>
                     </div>
                 """, unsafe_html=True)
                 
                 st.markdown(f"""
                     <div style='font-size:16px; font-weight:bold; margin-bottom:5px; color:#ddd;'>
-                        Rank 2: {r2_name} <span style='font-size:13px; font-weight:normal; color:#888;'>({r2_conf:.2%})</span>
+                        Rank 2: {r2_name} <span style='font-size:13px; font-weight:normal; color:#888;'>({r2_conf_txt})</span>
                     </div>
                 """, unsafe_html=True)
                 
                 st.markdown(f"""
                     <div style='font-size:13px; font-weight:normal; color:#aaa;'>
-                        Rank 3: {r3_name} <span>({r3_conf:.2%})</span>
+                        Rank 3: {r3_name} <span>({r3_conf_txt})</span>
                     </div>
                 """, unsafe_html=True)
             
