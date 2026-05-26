@@ -108,33 +108,69 @@ def extract_fallback_title(url):
     return " ".join([w for w in words if not w.isdigit() and len(w) > 2]).title()
 
 def extract_granular_evidence(text, primary_bias):
-    sentences = re.split(r'(?<=[.!?])\s+', text)[:30] 
+    """
+    Extracts structural market triggers and tail-risk signals based on primary sentiment.
+    Implements macro black-swan detection and balanced neutral mapping.
+    """
+    sentences = re.split(r'(?<=[.!?])\s+', text)[:40] 
     primary_evidence, opposing_evidence = [], []
     
-    if primary_bias == "BULLISH":
-        primary_tokens, opposing_tokens = BULLISH_TRIGGERS, BEARISH_TRIGGERS
-    elif primary_bias == "BEARISH":
-        primary_tokens, opposing_tokens = BEARISH_TRIGGERS, BULLISH_TRIGGERS
-    else:  # NEUTRAL → treat bullish as primary, bearish as opposing
-        primary_tokens, opposing_tokens = BULLISH_TRIGGERS, BEARISH_TRIGGERS
+    # Institutional Macro and Micro Tail-Risk Glossaries
+    macro_risk_words = ["war", "conflict", "clashed", "strikes", "supply shock", "shuttered", "disruption", "shortage", "blockade", "sanctions", "stalemate"]
+    macro_turnaround_words = ["truce", "peace efforts", "ceasefire", "reopening", "negotiations", "agreement"]
 
     for sentence in sentences:
         s_clean = sentence.strip()
         if len(s_clean) < 25 or any(g in s_clean.lower() for g in GARBAGE_PATTERNS):
             continue
-        if any(t in s_clean.lower() for t in primary_tokens) and len(primary_evidence) < 2:
-            if s_clean not in primary_evidence:
+        
+        s_lower = s_clean.lower()
+        
+        # --- PATH A: BULLISH PRIMARY SENTIMENT ---
+        if primary_bias == "BULLISH":
+            if any(t in s_lower for t in BULLISH_TRIGGERS) and len(primary_evidence) < 2:
+                if s_clean not in primary_evidence:
+                    primary_evidence.append(s_clean)
+            if (any(r in s_lower for r in macro_risk_words) or any(t in s_lower for t in BEARISH_TRIGGERS)) and len(opposing_evidence) < 1:
+                if s_clean not in primary_evidence:
+                    opposing_evidence.append(s_clean)
+
+        # --- PATH B: BEARISH PRIMARY SENTIMENT ---
+        elif primary_bias == "BEARISH":
+            if any(t in s_lower for t in BEARISH_TRIGGERS) and len(primary_evidence) < 2:
+                if s_clean not in primary_evidence:
+                    primary_evidence.append(s_clean)
+            if (any(r in s_lower for r in macro_turnaround_words) or any(t in s_lower for t in BULLISH_TRIGGERS)) and len(opposing_evidence) < 1:
+                if s_clean not in primary_evidence:
+                    opposing_evidence.append(s_clean)
+
+        # --- PATH C: NEUTRAL / COMPRESSED VOLATILITY SENTIMENT ---
+        else:
+            has_bull_token = any(t in s_lower for t in BULLISH_TRIGGERS)
+            has_bear_token = any(t in s_lower for t in BEARISH_TRIGGERS)
+            
+            if len(primary_evidence) == 0 and (has_bull_token or has_bear_token):
                 primary_evidence.append(s_clean)
-        if opposing_tokens and any(t in s_clean.lower() for t in opposing_tokens) and len(opposing_evidence) < 1:
-            if s_clean not in primary_evidence and s_clean not in opposing_evidence:
-                opposing_evidence.append(s_clean)
-                
+            elif len(primary_evidence) == 1:
+                first_is_bull = any(t in primary_evidence[0].lower() for t in BULLISH_TRIGGERS)
+                if first_is_bull and has_bear_token:
+                    primary_evidence.append(s_clean)
+                elif not first_is_bull and has_bull_token:
+                    primary_evidence.append(s_clean)
+            
+            if any(r in s_lower for r in macro_risk_words) and len(opposing_evidence) < 1:
+                if s_clean not in primary_evidence:
+                    opposing_evidence.append(s_clean)
+
+    # Robust Fallback Vector Processing
     if not primary_evidence and sentences:
         for s in sentences:
-            if len(s.strip()) > 40 and not any(g in s.lower() for g in GARBAGE_PATTERNS):
+            if len(s.strip()) > 35 and not any(g in s.lower() for g in GARBAGE_PATTERNS):
                 primary_evidence.append(s.strip())
-                break
-    return primary_evidence, opposing_evidence
+                if len(primary_evidence) == 2: 
+                    break
+
+    return primary_evidence[:2], opposing_evidence[:1]
 
 # =====================================================================
 # STEP 5: INTERACTION GATEWAY & OPERATIONAL INSTRUCTIONS
