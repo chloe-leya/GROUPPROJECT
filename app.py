@@ -124,5 +124,5 @@ st.subheader("Financial News & Intelligence Input Portal")
 st.markdown("*System auto-detects input format. Supports raw news copy, market tweets, or live news URLs (e.g., Yahoo Finance).*")
 
 # Keep the working Yahoo Finance URL as the premium default benchmark example
-default_text = ""https://finance.yahoo.com/news/nvidia-earnings-revenue-q3-2025-212015632.html"
+default_text = "https://finance.yahoo.com/news/nvidia-earnings-revenue-q3-2025-212015632.html"
 user_input = st.text_area("Input Terminal Gateway (Text/URL):", value=default_text, height=90)
