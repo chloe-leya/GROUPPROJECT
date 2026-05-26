@@ -30,7 +30,6 @@ TOPIC_LABELS = [
     "stock analysis investor opinion or commentary", "stock price movement rise fall or volatility"
 ]
 
-# Expanded highly-sensitive lexical triggers for institutional financial analytics
 BULLISH_TRIGGERS = ["surged", "beat", "growth", "jumped", "positive", "highest", "record", "demand", "upgrade", "gained", "climb", "bullish", "rose", "soared", "soar", "high", "above"]
 BEARISH_TRIGGERS = ["dropped", "missed", "fell", "slumped", "decline", "negative", "loss", "risk", "downgrade", "warned", "plunged", "deficit", "bearish", "constraint", "slowdown", "down"]
 
@@ -41,14 +40,12 @@ BEARISH_TRIGGERS = ["dropped", "missed", "fell", "slumped", "decline", "negative
 def initialize_pipelines():
     device = 0 if torch.cuda.is_available() else -1
     
-    # Pipeline 1: Fine-tuned Sentiment Classifier
     sentiment_pipe = pipeline(
         "text-classification",
         model="chloeleya/finbert-fine-tuned-sentiment-model",
         device=device
     )
     
-    # Pipeline 2: Zero-shot Topic Router
     topic_pipe = pipeline(
         "zero-shot-classification",
         model="facebook/bart-large-mnli",
@@ -65,24 +62,37 @@ with st.spinner("Synchronizing Institutional Model Matrices from HF Hub..."):
 # =====================================================================
 def extract_text_from_url(url):
     try:
-        req = urllib.request.Request(
-            url, 
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        )
-        with urllib.request.urlopen(req, timeout=10) as response:
+        # Create a premium spoofed browser environment to bypass anti-scraping walls
+        opener = urllib.request.build_opener()
+        opener.addheaders = [
+            ('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'),
+            ('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'),
+            ('Accept-Language', 'en-US,en;q=0.5'),
+            ('Connection', 'keep-alive'),
+            ('Cache-Control', 'max-age=0')
+        ]
+        
+        with opener.open(url, timeout=10) as response:
             html = response.read()
         
         soup = BeautifulSoup(html, 'html.parser')
         title = soup.find('h1').get_text().strip() if soup.find('h1') else ""
-        paragraphs = soup.find_all('p')
-        body_text = " ".join([p.get_text() for p in paragraphs[:4]])
         
+        # Pull text from paragraph elements
+        paragraphs = soup.find_all('p')
+        body_text_list = []
+        for p in paragraphs:
+            text_block = p.get_text().strip()
+            # Explicitly exclude common dynamic error notifications and cookie text strings
+            if len(text_block) > 25 and not any(x in text_block.lower() for x in ["something went wrong", "button links", "cookie policy", "browser settings"]):
+                body_text_list.append(text_block)
+                
+        body_text = " ".join(body_text_list[:5])
         return title, body_text
     except Exception:
         return None, None
 
 def extract_granular_evidence(text, primary_bias):
-    # Splits text preserving absolute digit strings for full data transparency
     sentences = re.split(r'(?<=[.!?])\s+', text)
     primary_evidence = []
     opposing_evidence = []
@@ -96,8 +106,8 @@ def extract_granular_evidence(text, primary_bias):
 
     for sentence in sentences:
         sentence_str = sentence.strip()
-        # Drop raw webpage noise or copyright footers scraped from URL buffers
-        if len(sentence_str) < 30 or "yahoo finance" in sentence_str.lower()[:20]:
+        # Filter boilerplate navigation frames out of tracking lists
+        if len(sentence_str) < 30 or any(x in sentence_str.lower() for x in ["yahoo finance", "sign in", "click here", "oops"]):
             continue
             
         if any(t in sentence_str.lower() for t in primary_tokens) and len(primary_evidence) < 2:
@@ -108,11 +118,12 @@ def extract_granular_evidence(text, primary_bias):
             if sentence_str not in primary_evidence and sentence_str not in opposing_evidence:
                 opposing_evidence.append(sentence_str)
                 
-    # Fallback protocol: If no specific trigger token matches, pull valid long wire frames
+    # Fallback system if token matching yield is dry
     if not primary_evidence:
         for s in sentences:
-            if len(s.strip()) > 40 and "yahoo finance" not in s.lower():
-                primary_evidence.append(s.strip())
+            s_clean = s.strip()
+            if len(s_clean) > 40 and not any(x in s_clean.lower() for x in ["yahoo finance", "oops", "something went wrong"]):
+                primary_evidence.append(s_clean)
                 if len(primary_evidence) >= 1:
                     break
         if not primary_evidence and sentences:
@@ -161,7 +172,6 @@ if run_analysis:
             # =========================================================
             # 🔥 DATA CLEANING & TITLE BOOSTING MATRIX
             # =========================================================
-            # Inference Block: Mask numerical anomalies with [NUM] token to prevent extreme price shifts (e.g., 130%) from distorting the base model weights
             clean_analysis_text = re.sub(r'\d+(,\d+)*', '[NUM]', raw_analysis_text)
             clean_title = re.sub(r'\d+(,\d+)*', '[NUM]', news_title) if news_title else ""
             
@@ -169,11 +179,9 @@ if run_analysis:
                 title_out = sentiment_engine(clean_title)[0]
                 full_out = sentiment_engine(clean_analysis_text)[0]
                 
-                # Standardize raw prediction string formats
                 t_label = title_out['label'].upper().strip()
                 f_label = full_out['label'].upper().strip()
                 
-                # Title Boosting Filter: Override if title yields strong structural trends (e.g. "Soared over 130%") with a confidence score above 80%
                 if ("POS" in t_label or t_label == "POSITIVE") and title_out['score'] > 0.80:
                     pred_sentiment = "POSITIVE"
                     senti_score = title_out['score']
@@ -213,7 +221,6 @@ if run_analysis:
                 action_color = "gray"
                 strategy_note = "Consensus balanced. Volatility compressed. Asset pricing normalized; alpha entry signals absent."
 
-            # Auditing Layer: Extract context from raw_analysis_text to ensure quantitative visibility (e.g., 130% stays visible)
             primary_catalysts, hidden_risks = extract_granular_evidence(raw_analysis_text, sentiment_bias)
 
             # =====================================================================
@@ -233,7 +240,6 @@ if run_analysis:
             
             st.markdown("---")
             
-            # ADVANCED DUAL-PANEL GRID FOR GRANULAR AUDITING
             col_left, col_right = st.columns(2)
             
             with col_left:
