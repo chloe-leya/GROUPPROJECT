@@ -30,7 +30,7 @@ TOPIC_LABELS = [
     "stock analysis investor opinion or commentary", "stock price movement rise fall or volatility"
 ]
 
-# === MODIFIED: Expanded bullish triggers ===
+# Expanded bullish triggers
 BULLISH_TRIGGERS = [
     "surged", "beat", "growth", "jumped", "positive", "highest", "record", "demand", 
     "upgrade", "upgraded", "gained", "climb", "bullish", "rose", "soared", "soar", 
@@ -38,7 +38,6 @@ BULLISH_TRIGGERS = [
     "contract", "minimum revenue", "guarantee", "outperform", "buy rating"
 ]
 
-# === MODIFIED: Expanded bearish triggers (kept "risk" but override will handle context) ===
 BEARISH_TRIGGERS = [
     "dropped", "missed", "fell", "slumped", "decline", "negative", "loss", "risk", 
     "downgrade", "downgraded", "warned", "plunged", "deficit", "bearish", "constraint", 
@@ -235,8 +234,7 @@ if run_analysis:
                 clean_name = topic_out['labels'][i].split(" or ")[0].title()
                 top_topics_ranked.append({"topic": clean_name, "confidence": topic_out['scores'][i]})
 
-            # 3. --- 🛠️ STRONG POSITIVE OVERRIDE (analyst upgrades / contract wins / price target hikes) ---
-            # Detect highly bullish signals that should override model hesitation
+            # 3. --- STRONG POSITIVE OVERRIDE (expanded for explicit bullish language) ---
             strong_bullish_patterns = [
                 "upgraded to overweight", "upgraded to buy", "raise price target", "raised target",
                 "price target to $", "upside to", "minimum revenue", "contractual revenue",
@@ -244,29 +242,31 @@ if run_analysis:
             ]
             has_strong_bullish = any(p in text_lower for p in strong_bullish_patterns)
             
-            # Also detect if the first topic is "Analyst Rating Upgrade" (high confidence)
+            explicit_bullish_phrases = [
+                "bullish outlook", "demand surges", "growth engine", "record high",
+                "strong demand", "revenue growth", "above expectations", "beat estimates",
+                "raised guidance", "positive outlook", "key growth", "remain strong"
+            ]
+            has_explicit_bullish = any(phrase in text_lower for phrase in explicit_bullish_phrases)
+            
             is_upgrade_topic = (len(top_topics_ranked) > 0 and 
                                 "analyst rating upgrade" in top_topics_ranked[0]['topic'].lower())
             
-            # Check for macro conflict override (same as before)
             has_supply_disruption = any(w in text_lower for w in ["supply chain", "disruption", "bottleneck", "hamstrung", "shortage", "blockade"])
             has_macro_cost_pressures = any(w in text_lower for w in ["rising costs", "inflation", "freight costs", "pressure on"])
             has_conflict_context = any(w in text_lower for w in ["war", "conflict", "stalemate", "tensions", "standoff", "strikes"])
             is_earnings = len(top_topics_ranked) > 0 and top_topics_ranked[0]['topic'] == "Earnings Report"
 
-            # Apply strong bullish override if conditions are met (and not in a supply disruption conflict)
-            if (has_strong_bullish or is_upgrade_topic) and not (has_conflict_context and has_supply_disruption):
-                pos_score = max(pos_score, 0.85)
+            # Apply bullish override if conditions met (and not in a supply‑conflict situation)
+            if (has_strong_bullish or has_explicit_bullish or is_upgrade_topic) and not (has_conflict_context and has_supply_disruption):
+                pos_score = max(pos_score, 0.80)
                 neg_score = min(neg_score, 0.10)
-                # Re-normalize later
             
-            # Macro danger zone handling (keep existing logic but softer for earnings)
+            # Macro danger zone handling (kept as original, slightly softened for earnings)
             if (has_conflict_context and has_supply_disruption) or (has_supply_disruption and has_macro_cost_pressures):
                 if is_earnings:
-                    # Let the FinBERT model decide, just reserve 15% for tail risk
                     neg_score = max(neg_score, 0.15)
                 else:
-                    # General news with macro alerts defaults to defensive
                     neg_score = max(neg_score, 0.60)
             
             # Probability Normalization Block
