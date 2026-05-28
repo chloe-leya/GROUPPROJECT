@@ -30,8 +30,21 @@ TOPIC_LABELS = [
     "stock analysis investor opinion or commentary", "stock price movement rise fall or volatility"
 ]
 
-BULLISH_TRIGGERS = ["surged", "beat", "growth", "jumped", "positive", "highest", "record", "demand", "upgrade", "gained", "climb", "bullish", "rose", "soared", "soar", "strong", "rally"]
-BEARISH_TRIGGERS = ["dropped", "missed", "fell", "slumped", "decline", "negative", "loss", "risk", "downgrade", "warned", "plunged", "deficit", "bearish", "constraint", "slowdown", "down", "weak", "disruption", "hamstrung", "shortage", "pressure", "bottleneck", "blockade"]
+# === MODIFIED: Expanded bullish triggers ===
+BULLISH_TRIGGERS = [
+    "surged", "beat", "growth", "jumped", "positive", "highest", "record", "demand", 
+    "upgrade", "upgraded", "gained", "climb", "bullish", "rose", "soared", "soar", 
+    "strong", "rally", "overweight", "raise target", "price target", "upside", 
+    "contract", "minimum revenue", "guarantee", "outperform", "buy rating"
+]
+
+# === MODIFIED: Expanded bearish triggers (kept "risk" but override will handle context) ===
+BEARISH_TRIGGERS = [
+    "dropped", "missed", "fell", "slumped", "decline", "negative", "loss", "risk", 
+    "downgrade", "downgraded", "warned", "plunged", "deficit", "bearish", "constraint", 
+    "slowdown", "down", "weak", "disruption", "hamstrung", "shortage", "pressure", 
+    "bottleneck", "blockade"
+]
 
 GARBAGE_PATTERNS = [
     "something went wrong", "cookie policy", "browser settings", "broker-dealer", 
@@ -222,23 +235,39 @@ if run_analysis:
                 clean_name = topic_out['labels'][i].split(" or ")[0].title()
                 top_topics_ranked.append({"topic": clean_name, "confidence": topic_out['scores'][i]})
 
-            # 3. --- 🛠️ RESOLVED RECONFIGURED DECISION MATRIX ---
+            # 3. --- 🛠️ STRONG POSITIVE OVERRIDE (analyst upgrades / contract wins / price target hikes) ---
+            # Detect highly bullish signals that should override model hesitation
+            strong_bullish_patterns = [
+                "upgraded to overweight", "upgraded to buy", "raise price target", "raised target",
+                "price target to $", "upside to", "minimum revenue", "contractual revenue",
+                "upgraded", "overweight rating", "buy rating", "outperform"
+            ]
+            has_strong_bullish = any(p in text_lower for p in strong_bullish_patterns)
+            
+            # Also detect if the first topic is "Analyst Rating Upgrade" (high confidence)
+            is_upgrade_topic = (len(top_topics_ranked) > 0 and 
+                                "analyst rating upgrade" in top_topics_ranked[0]['topic'].lower())
+            
+            # Check for macro conflict override (same as before)
             has_supply_disruption = any(w in text_lower for w in ["supply chain", "disruption", "bottleneck", "hamstrung", "shortage", "blockade"])
             has_macro_cost_pressures = any(w in text_lower for w in ["rising costs", "inflation", "freight costs", "pressure on"])
             has_conflict_context = any(w in text_lower for w in ["war", "conflict", "stalemate", "tensions", "standoff", "strikes"])
-
             is_earnings = len(top_topics_ranked) > 0 and top_topics_ranked[0]['topic'] == "Earnings Report"
 
-            # Check macro danger zones dynamically without crushing neural decisions
+            # Apply strong bullish override if conditions are met (and not in a supply disruption conflict)
+            if (has_strong_bullish or is_upgrade_topic) and not (has_conflict_context and has_supply_disruption):
+                pos_score = max(pos_score, 0.85)
+                neg_score = min(neg_score, 0.10)
+                # Re-normalize later
+            
+            # Macro danger zone handling (keep existing logic but softer for earnings)
             if (has_conflict_context and has_supply_disruption) or (has_supply_disruption and has_macro_cost_pressures):
                 if is_earnings:
-                    # Let the FinBERT model decide the fundamental direction, just reserve 15% for tail risk volatility
+                    # Let the FinBERT model decide, just reserve 15% for tail risk
                     neg_score = max(neg_score, 0.15)
-                    neu_score = 1.0 - (neg_score + pos_score) if (neg_score + pos_score) <= 1.0 else 0.0
                 else:
-                    # General generic news with macro alerts defaults to safe defensive bias
+                    # General news with macro alerts defaults to defensive
                     neg_score = max(neg_score, 0.60)
-                    neu_score = 1.0 - (neg_score + pos_score) if (neg_score + pos_score) <= 1.0 else 0.0
             
             # Probability Normalization Block
             total_sum = pos_score + neg_score + neu_score
