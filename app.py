@@ -30,7 +30,6 @@ TOPIC_LABELS = [
     "stock analysis investor opinion or commentary", "stock price movement rise fall or volatility"
 ]
 
-# Expanded bullish triggers
 BULLISH_TRIGGERS = [
     "surged", "beat", "growth", "jumped", "positive", "highest", "record", "demand", 
     "upgrade", "upgraded", "gained", "climb", "bullish", "rose", "soared", "soar", 
@@ -234,7 +233,7 @@ if run_analysis:
                 clean_name = topic_out['labels'][i].split(" or ")[0].title()
                 top_topics_ranked.append({"topic": clean_name, "confidence": topic_out['scores'][i]})
 
-            # 3. --- STRONG POSITIVE OVERRIDE (expanded for explicit bullish language) ---
+            # 3. --- STRONG POSITIVE OVERRIDE (with neutral suppression) ---
             strong_bullish_patterns = [
                 "upgraded to overweight", "upgraded to buy", "raise price target", "raised target",
                 "price target to $", "upside to", "minimum revenue", "contractual revenue",
@@ -257,12 +256,14 @@ if run_analysis:
             has_conflict_context = any(w in text_lower for w in ["war", "conflict", "stalemate", "tensions", "standoff", "strikes"])
             is_earnings = len(top_topics_ranked) > 0 and top_topics_ranked[0]['topic'] == "Earnings Report"
 
-            # Apply bullish override if conditions met (and not in a supply‑conflict situation)
+            # --- Force positive for explicit bullish content (suppress neutral) ---
             if (has_strong_bullish or has_explicit_bullish or is_upgrade_topic) and not (has_conflict_context and has_supply_disruption):
-                pos_score = max(pos_score, 0.80)
-                neg_score = min(neg_score, 0.10)
+                # Override to ensure POSITIVE wins after normalization
+                pos_score = 0.85
+                neu_score = 0.10
+                neg_score = 0.05
             
-            # Macro danger zone handling (kept as original, slightly softened for earnings)
+            # Macro danger zone handling (kept original)
             if (has_conflict_context and has_supply_disruption) or (has_supply_disruption and has_macro_cost_pressures):
                 if is_earnings:
                     neg_score = max(neg_score, 0.15)
